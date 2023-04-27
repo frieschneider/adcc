@@ -165,7 +165,9 @@ class ElectronicTransition:
             for tdm in self.transition_dm
         ])
         return ret
-
+    
+    @cached_property
+    @mark_excitation_property()
     @timed_member_call(timer="_property_timer")
     def transition_dipole_moment_velocity(self):
         """List of transition dipole moments in the

@@ -99,25 +99,33 @@ def mtm_adc3(mp, dipop, intermediates):
     tt2 = mp.tt2(b.ooovvv)
     ts3 = mp.ts3(b.ov)
     td3 = mp.td3(b.oovv)
+    if dipop.is_symmetric:
+        dipop_vo = dipop.ov.transpose((1, 0))
+    else:
+        dipop_vo = dipop.vo.copy()
 
     f1 += (
+        # dipop.vv
         + 1.0 * einsum('ib,ab->ia', ts3, dipop.vv)
-        - 1.0 * einsum('ja,ji->ia', ts3, dipop.oo)
-        - 1.0 * einsum('ijab,jb->ia', td3, dipop.ov)
-        + 1.0 * einsum('ijab,kb,jk->ia', t2, p0.ov, dipop.oo)
-        + 1.0 * einsum('jkab,kb,ji->ia', t2, p0.ov, dipop.oo)
         - 1.0 * einsum('ijbc,jc,ab->ia', t2, p0.ov, dipop.vv)
         - 1.0 * einsum('ijab,jc,cb->ia', t2, p0.ov, dipop.vv)
-        - 0.25 * einsum('ikbc,jkbc,ja->ia', t2, td2, dipop.ov)
-        - 0.25 * einsum('jkac,jkbc,ib->ia', t2, td2, dipop.ov)
-        + 0.5 * einsum('ijab,jkbc,kc->ia', t2, td2, dipop.ov)
-        - 0.25 * einsum('ikbc,jkbc,ja->ia', td2, t2, dipop.ov)
-        - 0.25 * einsum('jkac,jkbc,ib->ia', td2, t2, dipop.ov)
-        + 0.5 * einsum('ijab,jkbc,kc->ia', td2, t2, dipop.ov)
         + 0.5 * einsum('ijkabc,jkcd,db->ia', tt2, t2, dipop.vv)
         - 0.25 * einsum('ijkbcd,jkcd,ab->ia', tt2, t2, dipop.vv)
+        # dipop.oo
+        - 1.0 * einsum('ja,ji->ia', ts3, dipop.oo)
+        + 1.0 * einsum('ijab,kb,jk->ia', t2, p0.ov, dipop.oo)
+        + 1.0 * einsum('jkab,kb,ji->ia', t2, p0.ov, dipop.oo)
         + 0.5 * einsum('ijkabc,klbc,jl->ia', tt2, t2, dipop.oo)
         + 0.25 * einsum('jklabc,klbc,ji->ia', tt2, t2, dipop.oo)
+        # dipop_vo
+        - 0.25 * einsum('jkbc,ikbc,aj->ia', t2, td2, dipop_vo) 
+        - 0.25 * einsum('jkac,jkbc,bi->ia', t2, td2, dipop_vo) 
+        - 0.25 * einsum('jkbc,jibc,ak->ia', td2, t2, dipop_vo) 
+        - 0.25 * einsum('jkba,jkbc,ci->ia', td2, t2, dipop_vo) 
+        + 0.5 * einsum('jiac,jkbc,bk->ia', t2, td2, dipop_vo) 
+        - 0.5 * einsum('ijba,jkbc,ck->ia', td2, t2, dipop_vo) 
+        # dipop.ov
+        - 1.0 * einsum('ijab,jb->ia', td3, dipop.ov) 
         + 0.25 * einsum('ijac,klbd,klcd,jb->ia', t2, t2, t2, dipop.ov)
         - 0.25 * einsum('ijad,klbc,klcd,jb->ia', t2, t2, t2, dipop.ov)
         + 0.25 * einsum('ijbd,klac,klcd,jb->ia', t2, t2, t2, dipop.ov)
