@@ -189,12 +189,11 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
     matrix = construct_adcmatrix(
         data_or_matrix, core_orbitals=core_orbitals, frozen_core=frozen_core,
         frozen_virtual=frozen_virtual, method=method, gauge_origin=gauge_origin)
-
     # property method and method need to span the same excitation space
     if matrix.method.level // 2 != property_maxorder // 2:
         raise InputError(f"{method} and {property_maxorder} are not a valid "
                          "combination of method and property_maxorder.")
-        property_method = matrix.method.at_level(property_maxorder)
+    property_method = matrix.method.at_level(property_maxorder)
 
     n_states, kind = validate_state_parameters(
         matrix.reference_state, n_states=n_states, n_singlets=n_singlets,

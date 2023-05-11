@@ -117,9 +117,7 @@ IdedBispace<3 * N> bispace_product(const IdedBispace<N>& x, const IdedBispace<N>
 
 template <size_t N>
 lt::bispace<N> make_sym_bispace_aux(std::vector<IdedBispace<1>>) {
-=======
   throw not_implemented_error("Not implemented for N != 1, 2, 3, 4, 6");
->>>>>>> 360190bd1f48240f6ca4f4d6266db84eaa264186
 }
 
 template <>

@@ -135,13 +135,8 @@ def modified_transition_moments(method, ground_state, operator=None,
         raise NotImplementedError("modified_transition_moments is not "
                                   f"implemented for {method.name}.")
 
-<<<<<<< HEAD
-    ret = [DISPATCH[method.name](ground_state, dipop, intermediates)
-               for dipop in dipole_operator]
-=======
     ret = [DISPATCH[method.name](ground_state, op, intermediates)
            for op in operator]
->>>>>>> 360190bd1f48240f6ca4f4d6266db84eaa264186
     if unpack:
         assert len(ret) == 1
         ret = ret[0]
