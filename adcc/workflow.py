@@ -45,7 +45,8 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
             n_guesses_doubles=None, output=sys.stdout, core_orbitals=None,
             frozen_core=None, frozen_virtual=None, method=None,
             n_singlets=None, n_triplets=None, n_spin_flip=None,
-            environment=None, properties_level=None, gauge_origin ="mass_center", **solverargs):
+            environment=None, property_maxorder=None, gauge_origin ="origin",
+            **solverargs):
     """Run an ADC calculation.
 
     Main entry point to run an ADC calculation. The reference to build the ADC
@@ -134,13 +135,13 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
     gauge_origin: list or str, optional
         Define the gauge origin, either by specifying a list directly ([x,y,z])
         or by using one of the keywords ('mass_center', 'charge_center', 'origin').
-        Default: 'mass_center'
+        Default: 'origin'
 
-    properties_level : str, optional
-        The keyword to manually specify the ADC-method for the property
-        calculations. If none is given, the same as for the eigenvector
-        calculations is used. The default for ADC(3) are ADC(2)
-        properties.
+    property_maxorder : int, optional
+        Specifiy the order through which the ADC property calculation is expanded.
+        If none is given, the same as for the energy calculation is used.
+        Note that for ADC(3) the default is to compute properties correct through
+        2nd order.
 
     Other parameters
     ----------------
@@ -189,6 +190,12 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
         data_or_matrix, core_orbitals=core_orbitals, frozen_core=frozen_core,
         frozen_virtual=frozen_virtual, method=method, gauge_origin=gauge_origin)
 
+    # property method and method need to span the same excitation space
+    if matrix.method.level // 2 != property_maxorder // 2:
+        raise InputError(f"{method} and {property_maxorder} are not a valid "
+                         "combination of method and property_maxorder.")
+        property_method = matrix.method.at_level(property_maxorder)
+
     n_states, kind = validate_state_parameters(
         matrix.reference_state, n_states=n_states, n_singlets=n_singlets,
         n_triplets=n_triplets, n_spin_flip=n_spin_flip, kind=kind)
@@ -215,12 +222,7 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
         matrix, n_states, kind, guesses=guesses, n_guesses=n_guesses,
         n_guesses_doubles=n_guesses_doubles, conv_tol=conv_tol, output=output,
         eigensolver=eigensolver, **solverargs)
-
-    if method in ['adc0', 'adc1'] and properties_level in ['adc2', 'adc3']:
-        raise InputError("ADC(2) and ADC(3) properties are not compatible "
-                         "with ADC(0) and ADC(1) eigenvectors (missing "
-                         "doubles amplitude)")
-    exstates = ExcitedStates(diagres, property_method=properties_level)
+    exstates = ExcitedStates(diagres, property_method=property_method)
     exstates.kind = kind
     exstates.spin_change = spin_change
 

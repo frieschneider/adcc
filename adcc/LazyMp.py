@@ -94,91 +94,93 @@ class LazyMp:
         ) / denom
 
     @cached_member_function
-    def tt2(self, space):
-        """Second order triples amplitudes"""
+    def tt2(self, space: str):
+        """Return the MP2 triples amplitude."""
+        if space != b.ooovvv:
+            raise NotImplementedError("MP2 triples amplitudes not implemented"
+                                      f"for space {space}.")
         hf = self.reference_state
-        t2 = self.t2(b.oovv).evaluate()
+
         denom = - direct_sum('ia,jkbc->ijkabc', self.df(b.ov),
                              direct_sum('jb,kc->jkbc', self.df(b.ov),
-                             self.df(b.ov)))
-        amp = (
-            + einsum('idbc,jkad->ijkabc', hf.ovvv, t2)
-            + einsum('idab,jkcd->ijkabc', hf.ovvv, t2)
-            - einsum('jdab,ikcd->ijkabc', hf.ovvv, t2)
-            + einsum('kdab,ijcd->ijkabc', hf.ovvv, t2)
-            - einsum('jdbc,ikad->ijkabc', hf.ovvv, t2)
-            + einsum('kdbc,ijad->ijkabc', hf.ovvv, t2)
-            - einsum('idac,jkbd->ijkabc', hf.ovvv, t2)
-            + einsum('jdac,ikbd->ijkabc', hf.ovvv, t2)
-            - einsum('kdac,ijbd->ijkabc', hf.ovvv, t2)
-            + einsum('jkla,ilbc->ijkabc', hf.ooov, t2)
-            - einsum('ikla,jlbc->ijkabc', hf.ooov, t2)
-            + einsum('ijla,klbc->ijkabc', hf.ooov, t2)
-            + einsum('iklb,jlac->ijkabc', hf.ooov, t2)
-            - einsum('jklb,ilac->ijkabc', hf.ooov, t2)
-            - einsum('ijlb,klac->ijkabc', hf.ooov, t2)
-            - einsum('iklc,jlab->ijkabc', hf.ooov, t2)
-            + einsum('jklc,ilab->ijkabc', hf.ooov, t2)
-            + einsum('ijlc,klab->ijkabc', hf.ooov, t2)
-        )
-        return amp / denom
+                                        self.df(b.ov)))
+        denom = denom.symmetrise(0, 1, 2).symmetrise(3, 4, 5)
+
+        t = 9 * (  # 36 / 4, because we have 9 terms each
+            + 1.0 * einsum('kdbc,ijad->ijkabc', hf.ovvv, self.t2oo)
+            + 1.0 * einsum('jklc,ilab->ijkabc', hf.ooov, self.t2oo)
+        ).antisymmetrise(0, 1, 2).antisymmetrise(3, 4, 5)
+        return t / denom
 
     @cached_member_function
-    def ts3(self, space):
-        """Third order singles amplitudes"""
+    def ts3(self, space: str):
+        """Return the MP3 singles amplitude."""
+        if space != b.ov:
+            raise NotImplementedError("MP3 singles amplitude not implemented "
+                                      f"for space {space}.")
         hf = self.reference_state
-        p0 = self.mp2_diffdm
+        ts2 = self.mp2_diffdm.ov
         td2 = self.td2(b.oovv)
         tt2 = self.tt2(b.ooovvv)
+
         denom = - self.df(b.ov)
-        amp = (
-            - einsum('jaib,jb->ia', hf.ovov, p0.ov)
-            + 0.5 * einsum('jkib,jkab->ia', hf.ooov, td2)
+        t = (
             + 0.5 * einsum('jabc,ijbc->ia', hf.ovvv, td2)
+            + 0.5 * einsum('jkib,jkab->ia', hf.ooov, td2)
+            - 1.0 * einsum('jaib,jb->ia', hf.ovov, ts2)
             + 0.25 * einsum('jkbc,ijkabc->ia', hf.oovv, tt2)
         )
-        return amp / denom
+        return t / denom
 
     @cached_member_function
-    def td3(self, space):
-        """Third order doubles amplitudes"""
+    def td3(self, space: str):
+        """Return the MP3 doubles amplitude."""
+        if space != b.oovv:
+            raise NotImplementedError("MP3 doubles amplitude not implemented for "
+                                      f"space {space}")
+
         hf = self.reference_state
-        p0 = self.mp2_diffdm
-        t2 = self.t2(b.oovv).evaluate()
-        td2 = self.td2(b.oovv).evaluate()
-        tt2 = self.tt2(b.ooovvv).evaluate()
-        t2eri_vv = einsum('klbd,klcd->bc', t2, hf.oovv).evaluate()
-        t2eri_oo = einsum('jlcd,klcd->jk', t2, hf.oovv).evaluate()
-        t2eri_oovv = einsum('jlbd,klcd->jkbc', t2, hf.oovv).evaluate()
-        denom = direct_sum('ia,jb->ijab', self.df(b.ov), self.df(b.ov))
-        amp = (
-            + 2 * einsum('jc,abic->ijab', p0.ov, hf.vvov).antisymmetrise(0, 1)
-            + 2 * einsum('kb,kaij->ijab', p0.ov, hf.ovoo).antisymmetrise(2, 3)
-            + 4 * einsum('ikac,kbjc->ijab', td2,
-                         hf.ovov).antisymmetrise(0, 1).antisymmetrise(2, 3)
-            - 0.5 * einsum('ijcd,abcd->ijab', td2, hf.vvvv)
-            - 0.5 * einsum('klab,klij->ijab', td2, hf.oooo)
-            + einsum('jklabc,klic->ijab', tt2, hf.ooov).antisymmetrise(0, 1)
-            + einsum('ijkbcd,kacd->ijab', tt2, hf.ovvv).antisymmetrise(2, 3)
-            - 0.25 * einsum('ijac,bc->ijab', t2, t2eri_vv)
-            - 0.25 * einsum('ijad,bd->ijab', t2, t2eri_vv)
-            + 0.25 * einsum('ijbc,ac->ijab', t2, t2eri_vv)
-            + 0.25 * einsum('ijbd,ad->ijab', t2, t2eri_vv)
-            + 0.25 * einsum('ijcd,klab,klcd->ijab', t2, t2, hf.oovv)
-            - 0.25 * einsum('ikab,jk->ijab', t2, t2eri_oo)
-            + 0.25 * einsum('ikac,jkbc->ijab', t2, t2eri_oovv)
-            + 0.25 * einsum('ikad,jkbd->ijab', t2, t2eri_oovv)
-            - 0.25 * einsum('ikbc,jkac->ijab', t2, t2eri_oovv)
-            - 0.25 * einsum('ikbd,jkad->ijab', t2, t2eri_oovv)
-            + 0.25 * einsum('il,jlab->ijab', t2eri_oo, t2)
-            - 0.25 * einsum('ilab,jl->ijab', t2, t2eri_oo)
-            + 0.25 * einsum('ilac,jlbc->ijab', t2, t2eri_oovv)
-            + 0.25 * einsum('ilad,jlbd->ijab', t2, t2eri_oovv)
-            - 0.25 * einsum('ilbc,jlac->ijab', t2, t2eri_oovv)
-            - 0.25 * einsum('ilbd,jlad->ijab', t2, t2eri_oovv)
-            + 0.25 * einsum('ik,jkab->ijab', t2eri_oo, t2)
-        )
-        return amp / denom
+        t2_1 = self.t2(b.oovv)
+        t1_2 = self.mp2_diffdm.ov
+        t2_2 = self.td2(b.oovv)
+        t3_2 = self.tt2(b.ooovvv)
+
+        denom = direct_sum(
+            'ia,jb->ijab', self.df(b.ov), self.df(b.ov)
+        ).symmetrise(0, 1)
+        # The scaling in the comments is given as: [comp_scaling] / [mem_scaling]
+        ampl = (
+            + 2 * (  # (1 - P_ij)
+                # N^5: O^2V^3 / N^4: O^1V^3
+                + 1 * einsum('icab,jc->ijab', hf.ovvv, t1_2)
+                # N^7: O^4V^3 / N^6: O^3V^3
+                + 0.5 * einsum('klic,jklabc->ijab', hf.ooov, t3_2)
+                + 0.5 * einsum('ilab,jl->ijab', t2_1,  # N^5: O^3V^2 / N^4: O^2V^2
+                               einsum('klcd,jkcd->jl', hf.oovv, t2_1))
+            )
+            + 4 * (  # (1 - P_ij) (1 - P_ab)
+                # N^6: O^3V^3 / N^4: O^2V^2
+                + 1 * einsum('icka,jkbc->ijab', hf.ovov, t2_2)
+            )
+            + 2 * (  # (1 - P_ab)
+                # N^5: O^3V^2 / N^4: O^2V^2
+                + 1 * einsum('ijka,kb->ijab', hf.ooov, t1_2)
+                # N^7: O^3V^4 / N^6: O^3V^3
+                + 0.5 * einsum('kacd,ijkbcd->ijab', hf.ovvv, t3_2)
+                + 1 * einsum('ikbd,jkad->ijab', t2_1,  # N^6: O^3V^3 / N^4: O^2V^2
+                             einsum('klcd,jlac->jkad', hf.oovv, t2_1))
+                + 0.5 * einsum('ijad,bd->ijab', t2_1,  # N^5: O^2V^3 / N^4: O^2V^2
+                               einsum('klcd,klbc->bd', hf.oovv, t2_1))
+            )
+            # no symmetry operations required
+            # N^6: O^2V^4 / N^4: V^4
+            - 0.5 * einsum('abcd,ijcd->ijab', hf.vvvv, t2_2)
+            # N^6: O^4V^2 / N^4: O^2V^2
+            - 0.5 * einsum('ijkl,klab->ijab', hf.oooo, t2_2)
+            + 0.25 * einsum('klab,ijkl->ijab', t2_1,  # N^6: O^4V^2 / N^4: O^2V^2
+                            einsum('klcd,ijcd->ijkl', hf.oovv, t2_1))
+        ).antisymmetrise(0, 1).antisymmetrise(2, 3)
+        return ampl / denom
 
     @cached_member_function
     def t2eri(self, space, contraction):
@@ -209,7 +211,7 @@ class LazyMp:
     @timed_member_call(timer="timer")
     def mp2_diffdm(self):
         """
-        Return the MP2 differensce density in the MO basis.
+        Return the MP2 difference density in the MO basis.
         """
         hf = self.reference_state
         ret = OneParticleOperator(self.mospaces, is_symmetric=True)
@@ -259,29 +261,48 @@ class LazyMp:
     @cached_property
     @timed_member_call(timer="timer")
     def mp3_diffdm(self):
-        """
-        Return the MP3 difference density in the MO basis. mp2_diffdm is included
-        """
-        t2 = self.t2(b.oovv)
-        td2 = self.td2(b.oovv)
-        ts3 = self.ts3(b.ov)
-        tt2 = self.tt2(b.ooovvv)
-        p0 = self.mp2_diffdm
-        ret = self.mp2_diffdm
+        """Return the MP3 difference density in the MO basis, i.e, the
+           2nd and 3rd order contribution to the MP density matrx."""
+        if self.has_core_occupied_space:
+            raise NotImplementedError("MP3 difference density not implemented "
+                                      "for CVS.")
 
-        ret.oo = p0.oo - 0.5 * (
-            + einsum('jkab,ikab->ij', t2, td2)
-            + einsum('jkab,ikab->ij', td2, t2)
+        ret = OneParticleOperator(self.mospaces, is_symmetric=True)
+        mp2_dm = self.mp2_diffdm
+        ts2 = mp2_dm.ov
+        td2 = self.td2(b.oovv)
+        tt2 = self.tt2(b.ooovvv)
+        ts3 = self.ts3(b.ov)
+
+        # NOTE: it is possible to compute the MP3 density without
+        #       explicitly computing the MP2 triples, i.e., with
+        #       N^4 memory scaling.
+        #       However, the MP3 density is only needed for ISR3
+        #       currently, where we need the triples anyway.
+        #       So I think for now just use the triples... should be
+        #       computational more efficient.
+
+        ret.oo = (
+            # 2nd order
+            mp2_dm.oo
+            # 3rd order
+            - 1.0 * einsum('ikab,jkab->ij', self.t2oo, td2).symmetrise()
         )
-        ret.ov = p0.ov + (
+        ret.ov = (
+            # 2nd order
+            mp2_dm.ov
+            # 3rd order
+            - 1.0 * einsum('ijab,jb->ia', self.t2oo, ts2)
+            - 0.25 * einsum('jkbc,ijkabc->ia', self.t2oo, tt2)
             + ts3
-            - einsum('jb,ijab->ia', p0.ov, t2)
-            - 0.25 * einsum('jkbc,ijkabc->ia', t2, tt2)
         )
-        ret.vv = p0.vv + 0.5 * (
-            + einsum('ijac,ijbc->ab', td2, t2)
-            + einsum('ijac,ijbc->ab', t2, td2)
+        ret.vv = (
+            # 2nd order
+            mp2_dm.vv
+            # 3rd order
+            + 1.0 * einsum('ijac,ijbc->ab', self.t2oo, td2).symmetrise()
         )
+        ret.reference_state = self.reference_state
         return evaluate(ret)
 
     def density(self, level=2):
@@ -296,7 +317,7 @@ class LazyMp:
         elif level == 3:
             return self.reference_state.density + self.mp3_diffdm
         else:
-            raise NotImplementedError("Only densities for level 1 and 2"
+            raise NotImplementedError("Only densities for level 1, 2 and 3"
                                       " are implemented.")
 
     def dipole_moment(self, level=2):
@@ -311,7 +332,7 @@ class LazyMp:
         elif level == 3:
             return self.mp3_dipole_moment
         else:
-            raise NotImplementedError("Only dipole moments for level 1 and 2"
+            raise NotImplementedError("Only dipole moments for level 1, 2 and 3"
                                       " are implemented.")
 
     @cached_member_function
@@ -385,6 +406,10 @@ class LazyMp:
     def mp2_density(self):
         return self.density(2)
 
+    @property
+    def mp3_density(self):
+        return self.density(3)
+
     @cached_property
     def mp2_dipole_moment(self):
         refstate = self.reference_state
@@ -395,11 +420,10 @@ class LazyMp:
 
     @cached_property
     def mp3_dipole_moment(self):
-        # MP2_diffdm is included in mp3corr
         refstate = self.reference_state
         dipole_integrals = refstate.operators.electric_dipole
         mp3corr = -np.array([product_trace(comp, self.mp3_diffdm)
-                            for comp in dipole_integrals])
+                             for comp in dipole_integrals])
         return refstate.dipole_moment + mp3corr
 
 

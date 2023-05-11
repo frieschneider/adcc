@@ -85,6 +85,7 @@ class ElectronicTransition:
                 property_method = self.method
         elif not isinstance(property_method, AdcMethod):
             property_method = AdcMethod(property_method)
+        # Jonas: add another check for compatibility of method and property_method?
         self._property_method = property_method
 
         # Special stuff for special solvers
