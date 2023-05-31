@@ -141,7 +141,6 @@ DISPATCH = {
     "adc0": mtm_adc0,
     "adc1": mtm_adc1,
     "adc2": mtm_adc2,
-    "adc3": mtm_adc3,
     "cvs-adc0": mtm_cvs_adc0,
     "cvs-adc1": mtm_cvs_adc0,  # Identical to CVS-ADC(0)
     "cvs-adc2": mtm_cvs_adc2,
