@@ -62,6 +62,62 @@ def mtm_adc2(mp, op, intermediates):
     )
     return ampl + AmplitudeVector(ph=f1, pphh=f2)
 
+def mtm_adc3(mp, op, intermediates):
+    t2 = mp.t2(b.oovv)
+    p0 = mp.mp2_diffdm
+    td2 = mp.td2(b.oovv)
+    tt2 = mp.tt2(b.ooovvv)
+    ts3 = mp.ts3(b.ov)
+    td3 = mp.td3(b.oovv)
+
+    op_vo = op.ov.transpose() if op.is_symmetric else op.vo
+
+    ampl = mtm_adc2(mp, op, intermediates)
+    f1 = (
+        # op.vv
+        + 1.0 * einsum('ib,ab->ia', ts3, op.vv)
+        - 1.0 * einsum('ijbc,jc,ab->ia', t2, p0.ov, op.vv)
+        - 1.0 * einsum('ijab,jc,cb->ia', t2, p0.ov, op.vv)
+        + 0.5 * einsum('ijkabc,jkcd,db->ia', tt2, t2, op.vv)
+        - 0.25 * einsum('ijkbcd,jkcd,ab->ia', tt2, t2, op.vv)
+        # op.oo
+        - 1.0 * einsum('ja,ji->ia', ts3, op.oo)
+        + 1.0 * einsum('ijab,kb,jk->ia', t2, p0.ov, op.oo)
+        + 1.0 * einsum('jkab,kb,ji->ia', t2, p0.ov, op.oo)
+        + 0.5 * einsum('ijkabc,klbc,jl->ia', tt2, t2, op.oo)
+        + 0.25 * einsum('jklabc,klbc,ji->ia', tt2, t2, op.oo)
+        # op_vo
+        - 0.25 * einsum('jkbc,ikbc,aj->ia', t2, td2, op_vo)
+        - 0.25 * einsum('jkac,jkbc,bi->ia', t2, td2, op_vo)
+        - 0.25 * einsum('jkbc,jibc,ak->ia', td2, t2, op_vo)
+        - 0.25 * einsum('jkba,jkbc,ci->ia', td2, t2, op_vo)
+        + 0.5 * einsum('jiac,jkbc,bk->ia', t2, td2, op_vo)
+        - 0.5 * einsum('ijba,jkbc,ck->ia', td2, t2, op_vo)
+        # op.ov
+        - 1.0 * einsum('ijab,jb->ia', td3, op.ov)
+        + 0.25 * einsum('ijac,klbd,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ijad,klbc,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ijbd,klac,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ijcd,klab,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ikab,jlcd,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ikac,jlbd,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ikad,jlbc,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ikbc,jlad,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ikbd,jlac,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ikcd,jlab,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ilab,jkcd,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ilac,jkbd,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ilad,jkbc,klcd,jb->ia', t2, t2, t2, op.ov)
+        - 0.25 * einsum('ilbc,jkad,klcd,jb->ia', t2, t2, t2, op.ov)
+        + 0.25 * einsum('ilbd,jkac,klcd,jb->ia', t2, t2, t2, op.ov)
+    )
+    f2 = (
+        - 1.0 * einsum('ijbc,ac->ijab', td2, op.vv).antisymmetrise(2, 3)
+        - 1.0 * einsum('ikab,kj->ijab', td2, op.oo).antisymmetrise(0, 1)
+        - 0.5 * einsum('ijkabc,kc->ijab', tt2, op.ov)
+    )
+    return ampl + AmplitudeVector(ph=f1, pphh=f2)
+
 
 def mtm_cvs_adc0(mp, op, intermediates):
     f1 = op.cv if op.is_symmetric else op.vc.transpose()
@@ -79,11 +135,6 @@ def mtm_cvs_adc2(mp, op, intermediates):
     )
     f2 = (1 / sqrt(2)) * einsum("kI,kjab->jIab", op_oc, mp.t2(b.oovv))
     return ampl + AmplitudeVector(ph=f1, pphh=f2)
-
-
-def mtm_adc3(mp, op, intermediates):
-    print("WARNING: Using ADC(2) modified transition moments!")
-    return mtm_adc2(mp, op, intermediates)
 
 
 DISPATCH = {
