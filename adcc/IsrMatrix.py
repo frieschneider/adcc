@@ -174,3 +174,19 @@ class IsrMatrix(AdcMatrixlike):
             if all(isinstance(elem, AmplitudeVector) for elem in other):
                 return [self.matvec(ov) for ov in other]
         return NotImplemented
+
+    def block_apply(self, block, tensor, component):
+        """
+        Compute the application of a block of the ADC matrix
+        with another AmplitudeVector or Tensor. Non-matching blocks
+        in the AmplitudeVector will be ignored.
+        """
+        if not isinstance(tensor, libadcc.Tensor):
+            raise TypeError("tensor should be an adcc.Tensor")
+
+        with self.timer.record(f"apply/{block}"):
+            outblock, inblock = block.split("_")
+            ampl = AmplitudeVector(**{inblock: tensor})
+            ret = self.blocks_ph[component][block](ampl)
+            return getattr(ret, outblock)
+
