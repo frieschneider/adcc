@@ -21,6 +21,7 @@
 ##
 ## ---------------------------------------------------------------------
 import libadcc
+from itertools import combinations_with_replacement, permutations, product
 
 from .AdcMatrix import AdcMatrixlike
 from .LazyMp import LazyMp
@@ -175,18 +176,26 @@ class IsrMatrix(AdcMatrixlike):
                 return [self.matvec(ov) for ov in other]
         return NotImplemented
 
-    def block_apply(self, block, tensor, component):
+    def block_apply(self, block, tensor, component=None):
         """
-        Compute the application of a block of the ADC matrix
+        Compute the application of a block of the ISR matrix
         with another AmplitudeVector or Tensor. Non-matching blocks
         in the AmplitudeVector will be ignored.
         """
         if not isinstance(tensor, libadcc.Tensor):
             raise TypeError("tensor should be an adcc.Tensor")
-
-        with self.timer.record(f"apply/{block}"):
-            outblock, inblock = block.split("_")
-            ampl = AmplitudeVector(**{inblock: tensor})
-            ret = self.blocks_ph[component][block](ampl)
-            return getattr(ret, outblock)
-
+        if isinstance(component, int):
+            with self.timer.record(f"apply/{block}"):
+                outblock, inblock = block.split("_")
+                ampl = AmplitudeVector(**{inblock: tensor})
+                ret = self.blocks_ph[component][block](ampl)
+                return getattr(ret, outblock)
+        else:
+            with self.timer.record(f"apply/{block}"):
+                outblock, inblock = block.split("_")
+                ampl = AmplitudeVector(**{inblock: tensor})
+                components = list(range(len(self.operator)))
+                ret = [self.blocks_ph[comp][block](ampl) for 
+                        comp in components]
+                ret = [getattr(comp, outblock) for comp in ret]
+                return ret
