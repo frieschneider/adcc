@@ -104,9 +104,9 @@ class IsrMatrix(AdcMatrixlike):
         if block_orders["ph_pphh"] != block_orders["pphh_ph"]:
             raise ValueError("ph_pphh and pphh_ph should always have "
                              "the same order")
-        if block_orders["ph_pphh"] is not None \
-           and block_orders["pphh_pphh"] is None:
-            raise ValueError("pphh_pphh cannot be None if ph_pphh isn't.")
+        # if block_orders["ph_pphh"] is not None \
+        #    and block_orders["pphh_pphh"] is None:
+        #     raise ValueError("pphh_pphh cannot be None if ph_pphh isn't.")
         self.block_orders = block_orders
 
         # Build the blocks

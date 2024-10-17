@@ -104,11 +104,30 @@ def block_pphh_pphh_0(ground_state, op):
 # 0th order coupling
 #
 def block_ph_pphh_0(ground_state, op):
-    return AdcBlock(lambda ampl: 0, 0)
+    def apply(ampl):
+        f1 = 0.5 * (
+            - 2.0 * einsum('ilad,ld->ia', ampl.pphh, op.ov)
+            + 2.0 * einsum('ilca,lc->ia', ampl.pphh, op.ov)
+        )
+        return AmplitudeVector(ph=f1)
+    return AdcBlock(apply)
 
 
 def block_pphh_ph_0(ground_state, op):
-    return AdcBlock(lambda ampl: 0, 0)
+    if op.is_symmetric:
+        op_vo = op.ov.transpose()
+    else:
+        op_vo = op.vo
+    t2 = ground_state.t2(b.oovv)
+
+    def apply(ampl):
+        f2 = 0.5 * (
+            4.0 * (
+            + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo) 
+            ).antisymmetrise(0, 1).antisymmetrise(2, 3)
+            )
+        return AmplitudeVector(pphh=f2)
+    return AdcBlock(apply)
 
 
 #
@@ -131,8 +150,8 @@ def block_ph_pphh_1(ground_state, op):
     def apply(ampl):
         f1 = 0.5 * (
             - 2.0 * einsum('ilad,ld->ia', ampl.pphh, op.ov)
-            + 2.0 * einsum('ilad,lndf,fn->ia', ampl.pphh, t2, op_vo)
             + 2.0 * einsum('ilca,lc->ia', ampl.pphh, op.ov)
+            + 2.0 * einsum('ilad,lndf,fn->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('ilca,lncf,fn->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('klad,kled,ei->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('ilcd,nlcd,an->ia', ampl.pphh, t2, op_vo)
@@ -151,8 +170,8 @@ def block_pphh_ph_1(ground_state, op):
     def apply(ampl):
         f2 = 0.5 * (
             4.0 * (
-            + 1.0 * einsum('ia,kc,jkbc->ijab', ampl.ph, op.ov, t2) 
             + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo) 
+            + 1.0 * einsum('ia,kc,jkbc->ijab', ampl.ph, op.ov, t2) 
             ).antisymmetrise(0, 1).antisymmetrise(2, 3)
             + 2.0 * (
             + 1.0 * einsum('ka,kc,ijbc->ijab', ampl.ph, op.ov, t2) 
