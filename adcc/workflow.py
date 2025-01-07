@@ -47,7 +47,7 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
             n_guesses_doubles=None, output=sys.stdout, core_orbitals=None,
             frozen_core=None, frozen_virtual=None, method=None,
             n_singlets=None, n_triplets=None, n_spin_flip=None,
-            environment=None, **solverargs):
+            environment=None, property_maxorder=None, **solverargs):
     """Run an ADC calculation.
 
     Main entry point to run an ADC calculation. The reference to build the ADC
@@ -133,20 +133,12 @@ def run_adc(data_or_matrix, n_states=None, kind="any", conv_tol=None,
         The keywords to specify how coupling to an environment model,
         e.g. PE, is treated. For details see :ref:`environment`.
 
-<<<<<<< HEAD
-=======
-    gauge_origin: list or str, optional
-        Define the gauge origin, either by specifying a list directly ([x,y,z])
-        or by using one of the keywords ('mass_center', 'charge_center', 'origin').
-        Default: 'origin'
-
     property_maxorder : int, optional
         Specifiy the order through which the ADC property calculation is expanded.
         If none is given, the same as for the energy calculation is used.
         Note that for ADC(3) the default is to compute properties correct through
         2nd order.
 
->>>>>>> b_matrix_vector_product
     Other parameters
     ----------------
     max_subspace : int, optional
