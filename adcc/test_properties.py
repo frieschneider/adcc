@@ -96,6 +96,9 @@ class TestStateDipoleMoments(unittest.TestCase, Runners):
         refdata = cache.reference_data[system]
         state = cache.adc_states[system][method][kind]
 
+        # if method == 'adc3':
+        #    state._property_method = state.method.at_level(3)
+
         res_dms = state.state_dipole_moment
         ref = refdata[method][kind]
         n_ref = len(state.excitation_vector)
@@ -110,6 +113,9 @@ class TestState2StateTransitionDipoleMoments(unittest.TestCase, Runners):
 
         refdata = cache.reference_data[system]
         state = cache.adc_states[system][method][kind]
+
+        # if method == 'adc3':
+        #    state._property_method = state.method.at_level(3)
 
         state_to_state = refdata[method][kind]["state_to_state"]
         refevals = refdata[method][kind]["eigenvalues"]

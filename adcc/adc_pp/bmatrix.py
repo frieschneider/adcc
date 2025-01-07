@@ -105,10 +105,11 @@ def block_pphh_pphh_0(ground_state, op):
 #
 def block_ph_pphh_0(ground_state, op):
     def apply(ampl):
-        return AmplitudeVector(ph=0.5 * (
+        f1 = 0.5 * (
             - 2.0 * einsum('ilad,ld->ia', ampl.pphh, op.ov)
             + 2.0 * einsum('ilca,lc->ia', ampl.pphh, op.ov)
-        ))
+        )
+        return AmplitudeVector(ph=f1)
     return AdcBlock(apply)
 
 
@@ -117,16 +118,15 @@ def block_pphh_ph_0(ground_state, op):
         op_vo = op.ov.transpose()
     else:
         op_vo = op.vo
+    t2 = ground_state.t2(b.oovv)
 
     def apply(ampl):
-        return AmplitudeVector(pphh=0.5 * (
-            (
-                - 1.0 * einsum('ia,bj->ijab', ampl.ph, op_vo)
-                + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo)
-                + 1.0 * einsum('ib,aj->ijab', ampl.ph, op_vo)
-                - 1.0 * einsum('jb,ai->ijab', ampl.ph, op_vo)
+        f2 = 0.5 * (
+            4.0 * (
+            + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo) 
             ).antisymmetrise(0, 1).antisymmetrise(2, 3)
-        ))
+            )
+        return AmplitudeVector(pphh=f2)
     return AdcBlock(apply)
 
 
@@ -135,6 +135,7 @@ def block_pphh_ph_0(ground_state, op):
 #
 block_ph_ph_1 = block_ph_ph_0
 
+block_pphh_pphh_1 = block_pphh_pphh_0
 
 #
 # 1st order coupling
@@ -147,16 +148,15 @@ def block_ph_pphh_1(ground_state, op):
     t2 = ground_state.t2(b.oovv)
 
     def apply(ampl):
-        return AmplitudeVector(ph=0.5 * (
-            # zeroth order
+        f1 = 0.5 * (
             - 2.0 * einsum('ilad,ld->ia', ampl.pphh, op.ov)
             + 2.0 * einsum('ilca,lc->ia', ampl.pphh, op.ov)
-            # first order
             + 2.0 * einsum('ilad,lndf,fn->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('ilca,lncf,fn->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('klad,kled,ei->ia', ampl.pphh, t2, op_vo)
             - 2.0 * einsum('ilcd,nlcd,an->ia', ampl.pphh, t2, op_vo)
-        ))
+        )
+        return AmplitudeVector(ph=f1)
     return AdcBlock(apply)
 
 
@@ -168,28 +168,19 @@ def block_pphh_ph_1(ground_state, op):
     t2 = ground_state.t2(b.oovv)
 
     def apply(ampl):
-        return AmplitudeVector(pphh=0.5 * (
-            (
-                # zeroth order
-                - 1.0 * einsum('ia,bj->ijab', ampl.ph, op_vo)
-                + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo)
-                + 1.0 * einsum('ib,aj->ijab', ampl.ph, op_vo)
-                - 1.0 * einsum('jb,ai->ijab', ampl.ph, op_vo)
-                # first order
-                + 1.0 * einsum('ia,jnbf,nf->ijab', ampl.ph, t2, op.ov)
-                - 1.0 * einsum('ja,inbf,nf->ijab', ampl.ph, t2, op.ov)
-                - 1.0 * einsum('ib,jnaf,nf->ijab', ampl.ph, t2, op.ov)
-                + 1.0 * einsum('jb,inaf,nf->ijab', ampl.ph, t2, op.ov)
+        f2 = 0.5 * (
+            4.0 * (
+            + 1.0 * einsum('ja,bi->ijab', ampl.ph, op_vo) 
+            + 1.0 * einsum('ia,kc,jkbc->ijab', ampl.ph, op.ov, t2) 
             ).antisymmetrise(0, 1).antisymmetrise(2, 3)
-            + (
-                - 1.0 * einsum('ka,ijeb,ke->ijab', ampl.ph, t2, op.ov)
-                + 1.0 * einsum('kb,ijea,ke->ijab', ampl.ph, t2, op.ov)
+            + 2.0 * (
+            + 1.0 * einsum('ka,kc,ijbc->ijab', ampl.ph, op.ov, t2) 
             ).antisymmetrise(2, 3)
-            + (
-                - 1.0 * einsum('ic,njab,nc->ijab', ampl.ph, t2, op.ov)
-                + 1.0 * einsum('jc,niab,nc->ijab', ampl.ph, t2, op.ov)
+            + 2.0 * (
+            + 1.0 * einsum('ic,kc,jkab->ijab', ampl.ph, op.ov, t2)  
             ).antisymmetrise(0, 1)
-        ))
+        )
+        return AmplitudeVector(pphh=f2)
     return AdcBlock(apply)
 
 
@@ -205,35 +196,198 @@ def block_ph_ph_2(ground_state, op):
     t2 = ground_state.t2(b.oovv)
 
     def apply(ampl):
-        return AmplitudeVector(ph=(
-            # 0th order
-            + 1.0 * einsum('ic,ac->ia', ampl.ph, op.vv)
-            - 1.0 * einsum('ka,ki->ia', ampl.ph, op.oo)
-            # 2nd order
-            # (2,1)
-            - 1.0 * einsum('ic,jc,aj->ia', ampl.ph, p0.ov, op_vo)
-            - 1.0 * einsum('ka,kb,bi->ia', ampl.ph, p0.ov, op_vo)
-            - 1.0 * einsum('ic,ja,jc->ia', ampl.ph, p0.ov, op.ov)  # h.c.
-            - 1.0 * einsum('ka,ib,kb->ia', ampl.ph, p0.ov, op.ov)  # h.c.
-            # (2,2)
-            - 0.25 * einsum('ic,mnef,mnaf,ec->ia', ampl.ph, t2, t2, op.vv)
-            - 0.25 * einsum('ic,mnef,mncf,ae->ia', ampl.ph, t2, t2, op.vv)  # h.c.
-            # (2,3)
-            - 0.5 * einsum('ic,mnce,mnaf,ef->ia', ampl.ph, t2, t2, op.vv)
-            + 1.0 * einsum('ic,mncf,jnaf,jm->ia', ampl.ph, t2, t2, op.oo)
-            # (2,4)
-            + 0.25 * einsum('ka,mnef,inef,km->ia', ampl.ph, t2, t2, op.oo)
-            + 0.25 * einsum('ka,mnef,knef,mi->ia', ampl.ph, t2, t2, op.oo)  # h.c.
-            # (2,5)
-            - 1.0 * einsum('ka,knef,indf,ed->ia', ampl.ph, t2, t2, op.vv)
-            + 0.5 * einsum('ka,knef,imef,mn->ia', ampl.ph, t2, t2, op.oo)
-            # (2,6)
-            + 0.5 * einsum('kc,knef,inaf,ec->ia', ampl.ph, t2, t2, op.vv)
-            - 0.5 * einsum('kc,mncf,inaf,km->ia', ampl.ph, t2, t2, op.oo)
-            + 0.5 * einsum('kc,inef,kncf,ae->ia', ampl.ph, t2, t2, op.vv)  # h.c.
-            - 0.5 * einsum('kc,mnaf,kncf,mi->ia', ampl.ph, t2, t2, op.oo)  # h.c.
-            # (2,7)
-            - 1.0 * einsum('kc,kncf,imaf,mn->ia', ampl.ph, t2, t2, op.oo)
-            + 1.0 * einsum('kc,knce,inaf,ef->ia', ampl.ph, t2, t2, op.vv)
-        ))
+        first_order = block_ph_ph_1(ground_state, op).apply(ampl)
+        f1 = first_order.ph
+        f1 += (
+        # (2,1)
+        - 1.0 * einsum('ic,jc,aj->ia', ampl.ph, p0.ov, op_vo)
+        - 1.0 * einsum('ka,kb,bi->ia', ampl.ph, p0.ov, op_vo)
+        - 1.0 * einsum('ic,ja,jc->ia', ampl.ph, p0.ov, op.ov)  # h.c.
+        - 1.0 * einsum('ka,ib,kb->ia', ampl.ph, p0.ov, op.ov)  # h.c.
+        # (2,2)
+        - 0.25 * einsum('ic,mnef,mnaf,ec->ia', ampl.ph, t2, t2, op.vv)
+        - 0.25 * einsum('ic,mnef,mncf,ae->ia', ampl.ph, t2, t2, op.vv)  # h.c.
+        # (2,3)
+        - 0.5 * einsum('ic,mnce,mnaf,ef->ia', ampl.ph, t2, t2, op.vv)
+        + 1.0 * einsum('ic,mncf,jnaf,jm->ia', ampl.ph, t2, t2, op.oo)
+        # (2,4)
+        + 0.25 * einsum('ka,mnef,inef,km->ia', ampl.ph, t2, t2, op.oo)
+        + 0.25 * einsum('ka,mnef,knef,mi->ia', ampl.ph, t2, t2, op.oo)  # h.c.
+        # (2,5)
+        - 1.0 * einsum('ka,knef,indf,ed->ia', ampl.ph, t2, t2, op.vv)
+        + 0.5 * einsum('ka,knef,imef,mn->ia', ampl.ph, t2, t2, op.oo)
+        # (2,6)
+        + 0.5 * einsum('kc,knef,inaf,ec->ia', ampl.ph, t2, t2, op.vv)
+        - 0.5 * einsum('kc,mncf,inaf,km->ia', ampl.ph, t2, t2, op.oo)
+        + 0.5 * einsum('kc,inef,kncf,ae->ia', ampl.ph, t2, t2, op.vv)  # h.c.
+        - 0.5 * einsum('kc,mnaf,kncf,mi->ia', ampl.ph, t2, t2, op.oo)  # h.c.
+        # (2,7)
+        - 1.0 * einsum('kc,kncf,imaf,mn->ia', ampl.ph, t2, t2, op.oo)
+        + 1.0 * einsum('kc,knce,inaf,ef->ia', ampl.ph, t2, t2, op.vv)
+        )
+        return AmplitudeVector(ph=f1)
+    return AdcBlock(apply)
+
+#
+# 2nd order couplings
+#
+def block_ph_pphh_2(ground_state, op):
+    if op.is_symmetric:
+        op_vo = op.ov.transpose((1,0))
+    else:
+        op_vo = op.vo.copy()
+    p0 = ground_state.mp2_diffdm
+    t2 = ground_state.t2(b.oovv)
+    td2 = ground_state.td2(b.oovv)
+    
+    def apply(ampl):
+        first_order = block_ph_pphh_1(ground_state, op).apply(ampl)
+        f1 = first_order.ph
+        f1 += (
+            # op.vv
+            - 2.0 * einsum('ijac, jb, bc -> ia', ampl.pphh, p0.ov, op.vv)
+            # op.oo
+            + 2.0 * einsum('ikab, jb, kj -> ia', ampl.pphh, p0.ov, op.oo)
+            # op_vo
+            + 2.0 * einsum('ikac, jkbc, bj -> ia', ampl.pphh, td2, op_vo)
+            + 1.0 * einsum('ijbc, jkbc, ak -> ia', ampl.pphh, td2, op_vo)
+            - 1.0 * einsum('jkac, jkbc, bi -> ia', ampl.pphh, td2, op_vo)
+            # op.ov
+            + 1.0 * einsum('ijcd, jlcb, klba, kd -> ia', ampl.pphh, t2, t2, op.ov)
+            + 1.0 * einsum('ilba, jkdc, jlbc, kd -> ia', ampl.pphh, t2, t2, op.ov)
+            - 1.0 * einsum('jkba, ildc, klbc, jd -> ia', ampl.pphh, t2, t2, op.ov)
+            - 0.5 * einsum('jkcd, ilab, klcd, jb -> ia', ampl.pphh, t2, t2, op.ov)
+            + 0.5 * einsum('ikad, jlbc, jlbd, kc -> ia', ampl.pphh, t2, t2, op.ov)
+            + 0.5 * einsum('jlad, ikbc, jlbd, kc -> ia', ampl.pphh, t2, t2, op.ov)
+            - 0.5 * einsum('jkcd, ilba, jkbd, lc -> ia', ampl.pphh, t2, t2, op.ov)
+            + 0.5 * einsum('ijad, jlcb, klcb, kd -> ia', ampl.pphh, t2, t2, op.ov)
+            - 0.5 * einsum('ijbc, klda, jlbc, kd -> ia', ampl.pphh, t2, t2, op.ov)
+            - 0.25 * einsum('jlad, ikcb, jlcb, kd -> ia', ampl.pphh, t2, t2, op.ov)
+            + 0.25 * einsum('ijbc, klda, klbc, jd -> ia', ampl.pphh, t2, t2, op.ov)
+               )
+        return AmplitudeVector(ph = f1)
+    return AdcBlock(apply)
+
+def block_pphh_ph_2(ground_state, op):
+    if op.is_symmetric:
+        op_vo = op.ov.transpose((1,0))
+    else:
+        op_vo = op.vo.copy()
+    p0 = ground_state.mp2_diffdm
+    t2 = ground_state.t2(b.oovv)
+    td2 = ground_state.td2(b.oovv)
+
+    def apply(ampl):
+        first_order = block_pphh_ph_1(ground_state, op).apply(ampl)
+        f2 = first_order.pphh
+        f2 += 0.5 * (
+            4.0 * (
+                + 1.0 * einsum('ia,kc,jkbc->ijab', ampl.ph, op.ov, td2)  
+                + 0.5 * einsum('ja,dl,ikbc,klcd->ijab', ampl.ph, op_vo, t2, t2)  
+                + 0.5 * einsum('la,di,jkbc,klcd->ijab', ampl.ph, op_vo, t2, t2)  
+                + 0.5 * einsum('id,al,jkbc,klcd->ijab', ampl.ph, op_vo, t2, t2)  
+                - 0.25 * einsum('ia,dj,klbc,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+                - 0.25 * einsum('ja,bk,ilcd,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+                + 1.0 * einsum('ja,bc,ic->ijab', ampl.ph, op.vv, p0.ov)  
+                + 1.0 * einsum('ia,kj,kb->ijab', ampl.ph, op.oo, p0.ov)  
+            ).antisymmetrise(0, 1).antisymmetrise(2, 3)
+            + 2.0 * (
+                + 1.0 * einsum('ic,kc,jkab->ijab', ampl.ph, op.ov, td2)  
+                + 0.5 * einsum('jc,dl,ikab,klcd->ijab', ampl.ph, op_vo, t2, t2)  
+                + 0.5 * einsum('lc,di,jkab,klcd->ijab', ampl.ph, op_vo, t2, t2)  
+                - 0.25 * einsum('ic,dj,klab,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+            ).antisymmetrise(0, 1)
+            + 2.0 * (
+                + 1.0 * einsum('ka,kc,ijbc->ijab', ampl.ph, op.ov, td2) 
+                + 0.5 * einsum('kb,dl,ijac,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+                + 0.5 * einsum('kd,al,ijbc,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+                - 0.25 * einsum('ka,bl,ijcd,klcd->ijab', ampl.ph, op_vo, t2, t2) 
+            ).antisymmetrise(2, 3)
+        )
+        return AmplitudeVector(pphh = f2)
+    return AdcBlock(apply)
+
+# 
+# 3rd order main
+#
+def block_ph_ph_3(ground_state, op):
+    if op.is_symmetric:
+        op_vo = op.ov.transpose((1,0))
+    else:
+        op_vo = op.vo.copy()
+    p0 = ground_state.mp2_diffdm
+    t2 = ground_state.t2(b.oovv)
+    td2 = ground_state.td2(b.oovv)
+    tt2 = ground_state.tt2(b.ooovvv)
+    ts3 = ground_state.ts3(b.ov)
+
+    def apply(ampl):
+        second_order = block_ph_ph_2(ground_state, op).apply(ampl)
+        f1 = second_order.ph
+        f1 += (
+            (
+            # op.vv
+            + 1.0 * einsum('ka,cd,ijbd,jkbc->ia', ampl.ph, op.vv, t2, td2)  
+            + 1.0 * einsum('kd,cb,ijab,jkcd->ia', ampl.ph, op.vv, t2, td2)  
+            + 0.5 * einsum('jc,ab,ikbd,jkcd->ia', ampl.ph, op.vv, t2, td2) 
+            + 0.5 * einsum('jc,ad,jkbc,ikbd->ia', ampl.ph, op.vv, t2, td2) 
+            + 0.5 * einsum('kc,dc,ijab,jkbd->ia', ampl.ph, op.vv, t2, td2) 
+            + 0.5 * einsum('id,cb,jkab,jkcd->ia', ampl.ph, op.vv, t2, td2) 
+            - 1.0 * einsum('ja,dc,jkbd,ikbc->ia', ampl.ph, op.vv, t2, td2)  
+            - 1.0 * einsum('kb,dc,jkbd,ijac->ia', ampl.ph, op.vv, t2, td2)  
+            - 0.5 * einsum('ib,dc,jkbd,jkac->ia', ampl.ph, op.vv, t2, td2) 
+            - 0.5 * einsum('kb,cb,jkcd,ijad->ia', ampl.ph, op.vv, t2, td2) 
+            - 0.25 * einsum('ib,cb,jkcd,jkad->ia', ampl.ph, op.vv, t2, td2) 
+            - 0.25 * einsum('ic,ab,jkbd,jkcd->ia', ampl.ph, op.vv, t2, td2) 
+            - 0.25 * einsum('ic,ab,jkcd,jkbd->ia', ampl.ph, op.vv, t2, td2) 
+            + 0.25 * einsum('id,cd,jkab,jkbc->ia', ampl.ph, op.vv, t2, td2) 
+            # op.oo
+            + 1.0 * einsum('kb,lj,jkbc,ilac->ia', ampl.ph, op.oo, t2, td2)  
+            + 1.0 * einsum('ic,lj,klab,jkbc->ia', ampl.ph, op.oo, t2, td2)  
+            + 0.5 * einsum('ja,lk,jkbc,ilbc->ia', ampl.ph, op.oo, t2, td2) 
+            - 1.0 * einsum('ib,jl,klbc,jkac->ia', ampl.ph, op.oo, t2, td2)  
+            - 1.0 * einsum('lc,kj,ikab,jlbc->ia', ampl.ph, op.oo, t2, td2)  
+            - 0.5 * einsum('la,kj,ikbc,jlbc->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.5 * einsum('jb,jk,klbc,ilac->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.5 * einsum('jb,ki,jlbc,klac->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.5 * einsum('kb,ji,jlac,klbc->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.5 * einsum('kc,kl,ijab,jlbc->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.25 * einsum('ja,jl,ikbc,klbc->ia', ampl.ph, op.oo, t2, td2) 
+            - 0.25 * einsum('ka,kl,jlbc,ijbc->ia', ampl.ph, op.oo, t2, td2) 
+            + 0.25 * einsum('ja,ki,jlbc,klbc->ia', ampl.ph, op.oo, t2, td2) 
+            + 0.25 * einsum('ka,ji,jlbc,klbc->ia', ampl.ph, op.oo, t2, td2) 
+            # op_vo
+            - 1.0 * einsum('ja,bi,jb->ia', ampl.ph, op_vo, ts3) 
+            - 1.0 * einsum('ib,aj,jb->ia', ampl.ph, op_vo, ts3) 
+            + 1.0 * einsum('ib,aj,jkbc,kc->ia', ampl.ph, op_vo, t2, p0.ov) 
+            + 1.0 * einsum('jb,ak,jkbc,ic->ia', ampl.ph, op_vo, t2, p0.ov) 
+            + 1.0 * einsum('jb,ci,jkbc,ka->ia', ampl.ph, op_vo, t2, p0.ov) 
+            + 1.0 * einsum('jd,ck,ilab,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            + 0.5 * einsum('kd,ci,jlab,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            - 1.0 * einsum('ja,ci,jkbc,kb->ia', ampl.ph, op_vo, t2, p0.ov) 
+            - 1.0 * einsum('ka,cj,jkbc,ib->ia', ampl.ph, op_vo, t2, p0.ov) 
+            - 1.0 * einsum('ib,cj,jkbc,ka->ia', ampl.ph, op_vo, t2, p0.ov) 
+            - 0.5 * einsum('ja,cl,ikbd,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            - 0.5 * einsum('jc,ak,ilbd,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            - 0.5 * einsum('id,ck,jlab,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            - 0.25 * einsum('ja,ci,klbd,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            - 0.25 * einsum('ic,aj,klbd,jklbcd->ia', ampl.ph, op_vo, t2, tt2) 
+            # op.ov
+            - 1.0 * einsum('ja,jb,ib->ia', ampl.ph, op.ov, ts3) 
+            - 1.0 * einsum('ib,jb,ja->ia', ampl.ph, op.ov, ts3) 
+            + 1.0 * einsum('ka,jc,ijbc,kb->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 1.0 * einsum('ka,kb,ijbc,jc->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 1.0 * einsum('ic,jc,jkab,kb->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 1.0 * einsum('ic,kb,jkab,jc->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 1.0 * einsum('jc,jb,ikab,kc->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 1.0 * einsum('jc,kc,ikab,jb->ia', ampl.ph, op.ov, t2, p0.ov) 
+            + 0.5 * einsum('ka,jc,klbd,ijlbcd->ia', ampl.ph, op.ov, t2, tt2) 
+            + 0.5 * einsum('kc,jc,klbd,ijlabd->ia', ampl.ph, op.ov, t2, tt2) 
+            + 0.5 * einsum('lc,ld,jkbc,ijkabd->ia', ampl.ph, op.ov, t2, tt2) 
+            - 1.0 * einsum('kc,jd,klbc,ijlabd->ia', ampl.ph, op.ov, t2, tt2)    
+            - 0.5 * einsum('ic,lb,jkcd,jklabd->ia', ampl.ph, op.ov, t2, tt2)   
+            - 0.25 * einsum('la,lc,jkbd,ijkbcd->ia', ampl.ph, op.ov, t2, tt2)  
+            + 0.25 * einsum('ic,jc,klbd,jklabd->ia', ampl.ph, op.ov, t2, tt2)  
+            ))
+        return AmplitudeVector(ph = f1)
     return AdcBlock(apply)

@@ -78,13 +78,16 @@ class ElectronicTransition:
         if not isinstance(self.method, AdcMethod):
             self.method = AdcMethod(self.method)
         if property_method is None:
-            if self.method.level < 3:
-                property_method = self.method
-            else:
+            if self.method.level == 3:
                 # Auto-select ADC(2) properties for ADC(3) calc
                 property_method = self.method.at_level(2)
+            else:
+                property_method = self.method
         elif not isinstance(property_method, AdcMethod):
             property_method = AdcMethod(property_method)
+        # Add another check for compatibility of method and property_method?
+        # But we can also allow everything here, because the main entry point
+        # (except for s2s properties) should be run_adc anyway.
         self._property_method = property_method
 
         # Special stuff for special solvers
@@ -160,7 +163,7 @@ class ElectronicTransition:
             warnings.warn("ADC(0) transition dipole moments are known to be "
                           "faulty in some cases.")
         dipole_integrals = self.operators.electric_dipole
-        return np.array([
+        ret = np.array([
             [product_trace(comp, tdm) for comp in dipole_integrals]
             for tdm in self.transition_dm
         ])

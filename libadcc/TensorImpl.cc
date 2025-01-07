@@ -165,6 +165,37 @@ std::pair<lt::expr::label<M>, lt::expr::label<M>> parse_permutation(
   return {lt::expr::label<M>(set1), lt::expr::label<M>(set2)};
 }
 
+template <size_t N>
+std::array<lt::expr::label<1>, 3> parse_triple_permutation(
+      const std::vector<AxisInfo>& axes, const lt::expr::label<N>& label,
+      const std::vector<std::vector<size_t>>& permutations) {
+
+  if (permutations.size() != 1) {
+    throw invalid_argument(
+          "A triples permutation can only contain 1 permutation, e.g., '0, 1, 2'.");
+  }
+  auto& perm = permutations[0];
+
+  if (perm.size() != 3) {
+    throw invalid_argument("A triples permutation need to have 3 indices.");
+  }
+
+  if (perm[0] >= N || perm[1] >= N || perm[2] >= N) {
+    throw invalid_argument(
+          "Index in permutation list cannot be larger than dimension.");
+  }
+  if (axes[perm[0]] != axes[perm[1]] || axes[perm[0]] != axes[perm[2]]) {
+    throw invalid_argument(
+          "(Anti)-Symmetrisation can only be performed over equivalent axes (not '" +
+          axes[perm[0]].label + ", " + axes[perm[1]].label + " and " +
+          axes[perm[2]].label + "').");
+  }
+
+  return {lt::expr::label<1>(label.letter_at(perm[0])),
+          lt::expr::label<1>(label.letter_at(perm[1])),
+          lt::expr::label<1>(label.letter_at(perm[2]))};
+}
+
 template <size_t N, typename T>
 std::pair<lt::index<N>, lt::index<N>> assert_convert_tensor_index(
       lt::btensor<N, T>& tensor, const std::vector<size_t>& idx) {
@@ -497,7 +528,16 @@ std::shared_ptr<Tensor> TensorImpl<N>::diagonal(std::vector<size_t> axes) {
   IF_MATCHES_EXECUTE(3, 3)  //
   IF_MATCHES_EXECUTE(4, 2)  //
   IF_MATCHES_EXECUTE(4, 3)  //
-  IF_MATCHES_EXECUTE(4, 3)  //
+  IF_MATCHES_EXECUTE(4, 4)  //
+  IF_MATCHES_EXECUTE(5, 2)  //
+  IF_MATCHES_EXECUTE(5, 3)  //
+  IF_MATCHES_EXECUTE(5, 4)  //
+  IF_MATCHES_EXECUTE(5, 5)  //
+  IF_MATCHES_EXECUTE(6, 2)  //
+  IF_MATCHES_EXECUTE(6, 3)  //
+  IF_MATCHES_EXECUTE(6, 4)  //
+  IF_MATCHES_EXECUTE(6, 5)  //
+  IF_MATCHES_EXECUTE(6, 6)  //
 
   throw not_implemented_error("diagonal not implemented for dimensionality " +
                               std::to_string(N) + " and " + std::to_string(diag.size()) +
@@ -711,9 +751,18 @@ std::shared_ptr<Tensor> TensorImpl<N>::direct_sum(std::shared_ptr<Tensor> other)
   IF_MATCHES_EXECUTE(1, 1)  //
   IF_MATCHES_EXECUTE(1, 2)  //
   IF_MATCHES_EXECUTE(1, 3)  //
+  IF_MATCHES_EXECUTE(1, 4)  //
+  IF_MATCHES_EXECUTE(1, 5)  //
   IF_MATCHES_EXECUTE(2, 1)  //
   IF_MATCHES_EXECUTE(2, 2)  //
+  IF_MATCHES_EXECUTE(2, 3)  //
+  IF_MATCHES_EXECUTE(2, 4)  //
   IF_MATCHES_EXECUTE(3, 1)  //
+  IF_MATCHES_EXECUTE(3, 2)  //
+  IF_MATCHES_EXECUTE(3, 3)  //
+  IF_MATCHES_EXECUTE(4, 1)  //
+  IF_MATCHES_EXECUTE(4, 2)  //
+  IF_MATCHES_EXECUTE(5, 1)  //
 
   throw not_implemented_error(
         "Did not implement the case of a direct_sum of two tensors of dimension " +
@@ -928,12 +977,21 @@ TensorOrScalar TensorImpl<N>::tensordot(
     //
     // Instantiation generated from TensorImpl/instantiate_valid.py
     //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 1)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 1)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(3, 1)  //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(1, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(2, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(3, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(3, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(3, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(4, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(4, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD(5, 1) //
 
 #undef IF_DIMENSIONS_MATCH_EXECUTE_TENSORPROD
   } else {
@@ -956,29 +1014,78 @@ TensorOrScalar TensorImpl<N>::tensordot(
     //
     // Instantiation generated from TensorImpl/instantiate_valid.py
     //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 1)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 1)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 1)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 2)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 3, 4)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 3)  //
-    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 4)  //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 1, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 2, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 3, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 4, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 5, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 5, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 5, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 6, 1) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(1, 6, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 2, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 3, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 4, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 5, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 5, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 5, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 5, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 6, 2) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 6, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(2, 6, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 3, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 3, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 3, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 4, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 5, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 5, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 5, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 5, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 6, 3) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 6, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 6, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(3, 6, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 4, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 4, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 5, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 5, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 5, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 6, 4) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 6, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(4, 6, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(5, 5, 6) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(5, 6, 5) //
+    IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT(5, 6, 6) //
 
 #undef IF_DIMENSIONS_MATCH_EXECUTE_CONTRACT
   }
@@ -1034,14 +1141,23 @@ std::shared_ptr<Tensor> TensorImpl<N>::symmetrise(
   // Execute the operation
   auto symmetrised = [&permutations, &lthis, this, label]() {
     if (permutations.size() == 1) {
-      auto parsed = parse_permutation<1>(m_axes, strip_safe<N>(label), permutations);
-      return 0.5 * lt::expr::symm(parsed.first, parsed.second, lthis);
+      if (permutations[0].size() == 3) {
+        // Triples Symmetry!
+        // Only makes sense to provide triples sym as single perm, e.g., call
+        // Tensor.symmetrise(0, 1, 2)
+        auto parsed = parse_triple_permutation(m_axes, strip_safe<N>(label),
+                                               permutations);
+        return 1. / 6. * lt::expr::symm(parsed[0], parsed[1], parsed[2], lthis);
+      } else {
+        auto parsed = parse_permutation<1>(m_axes, strip_safe<N>(label), permutations);
+        return 0.5 * lt::expr::symm(parsed.first, parsed.second, lthis);
+      }
     } else if (permutations.size() == 2) {
       auto parsed = parse_permutation<2>(m_axes, strip_safe<N>(label), permutations);
       return 0.5 * lt::expr::symm(parsed.first, parsed.second, lthis);
     } else {
       throw runtime_error(
-            "Antisymmetrisation not implemented for more than two index pairs.");
+            "Symmetrisation not implemented for more than two index pairs.");
     }
   }();
 
@@ -1068,8 +1184,15 @@ std::shared_ptr<Tensor> TensorImpl<N>::antisymmetrise(
   auto antisymmetrised = [&permutations, &lthis, this, &label]() {
     if (permutations.size() == 1) {
 
-      auto parsed = parse_permutation<1>(m_axes, strip_safe<N>(label), permutations);
-      return 0.5 * lt::expr::asymm(parsed.first, parsed.second, lthis);
+      if (permutations[0].size() == 3) {
+        // Triples Antisymmetry
+        auto parsed = parse_triple_permutation(m_axes, strip_safe<N>(label),
+                                               permutations);
+        return 1. / 6. * lt::expr::asymm(parsed[0], parsed[1], parsed[2], lthis);
+      } else {
+        auto parsed = parse_permutation<1>(m_axes, strip_safe<N>(label), permutations);
+        return 0.5 * lt::expr::asymm(parsed.first, parsed.second, lthis);
+      }
     } else if (permutations.size() == 2) {
       auto parsed = parse_permutation<2>(m_axes, strip_safe<N>(label), permutations);
       return 0.5 * lt::expr::asymm(parsed.first, parsed.second, lthis);
@@ -1401,8 +1524,12 @@ std::shared_ptr<ExpressionTree> as_expression(const std::shared_ptr<Tensor>& ten
     ret = std::static_pointer_cast<TensorImpl<3>>(tensor)->expression_ptr();
   } else if (tensor->ndim() == 4) {
     ret = std::static_pointer_cast<TensorImpl<4>>(tensor)->expression_ptr();
+  } else if (tensor->ndim() == 5) {
+    ret = std::static_pointer_cast<TensorImpl<5>>(tensor)->expression_ptr();
+  } else if (tensor->ndim() == 6) {
+    ret = std::static_pointer_cast<TensorImpl<6>>(tensor)->expression_ptr();
   } else {
-    throw not_implemented_error("Only implemented for dimensionality <= 4.");
+    throw not_implemented_error("Only implemented for dimensionality <= 6.");
   }
 
   if (ret->permutation.size() != tensor->ndim()) {
@@ -1460,8 +1587,12 @@ std::shared_ptr<Tensor> make_tensor(std::shared_ptr<Symmetry> symmetry) {
     return make_tensor_inner<3>(symmetry);
   } else if (symmetry->ndim() == 4) {
     return make_tensor_inner<4>(symmetry);
+  } else if (symmetry->ndim() == 5) {
+    return make_tensor_inner<5>(symmetry);
+  } else if (symmetry->ndim() == 6) {
+    return make_tensor_inner<6>(symmetry);
   } else {
-    throw not_implemented_error("Only implemented for dimensionality <= 4.");
+    throw not_implemented_error("Only implemented for dimensionality <= 6.");
   }
 }
 
@@ -1475,8 +1606,12 @@ std::shared_ptr<Tensor> make_tensor(std::shared_ptr<const AdcMemory> adcmem_ptr,
     return std::make_shared<TensorImpl<3>>(adcmem_ptr, axes);
   } else if (axes.size() == 4) {
     return std::make_shared<TensorImpl<4>>(adcmem_ptr, axes);
+  } else if (axes.size() == 5) {
+    return std::make_shared<TensorImpl<5>>(adcmem_ptr, axes);
+  } else if (axes.size() == 6) {
+    return std::make_shared<TensorImpl<6>>(adcmem_ptr, axes);
   } else {
-    throw not_implemented_error("Only implemented for dimensionality <= 4.");
+    throw not_implemented_error("Only implemented for dimensionality <= 6.");
   }
 }
 
@@ -1496,6 +1631,8 @@ INSTANTIATE(1)
 INSTANTIATE(2)
 INSTANTIATE(3)
 INSTANTIATE(4)
+INSTANTIATE(5)
+INSTANTIATE(6)
 
 #undef INSTANTIATE
 
