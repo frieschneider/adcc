@@ -310,7 +310,7 @@ class LazyMp:
         Return the MP density in the MO basis with all corrections
         up to the specified order of perturbation theory
         """
-        if level == 1:
+        if level in [0, 1]:
             return self.reference_state.density
         elif level == 2:
             return self.reference_state.density + self.mp2_diffdm
@@ -325,7 +325,7 @@ class LazyMp:
         Return the MP dipole moment at the specified level of
         perturbation theory.
         """
-        if level == 1:
+        if level in [0, 1]:
             return self.reference_state.dipole_moment
         elif level == 2:
             return self.mp2_dipole_moment
