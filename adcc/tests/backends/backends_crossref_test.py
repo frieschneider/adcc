@@ -27,12 +27,14 @@ from numpy.testing import assert_allclose
 
 import adcc
 import adcc.backends
+from adcc.misc import assert_allclose_signfix
 
 from .testing import cached_backend_hf
 from .. import testcases
 
 # molsturm is super slow
 backends = [b for b in adcc.backends.available() if b != "molsturm"]
+backends_with_gauge_origin = ["pyscf", "veloxchem"]
 
 h2o = testcases.get_by_filename("h2o_sto3g", "h2o_def2tzvp")
 h2o_cases = [(case.file_name, c) for case in h2o for c in case.cases]
@@ -62,7 +64,7 @@ class TestCrossReferenceBackends:
             backends_test = [b for b in backends]
         if len(backends_test) < 2:
             pytest.skip("Veloxchem does not support f-functions. "
-                        "Not enough backends that support UHF available.")
+                        "Not enough backends available.")
 
         kwargs = {"n_singlets": 5}
         # fewer states available for fc-fv-cvs (4) and fv-cvs (5)
@@ -146,7 +148,7 @@ class TestCrossReferenceBackends:
             backends_test = [b for b in backends]
         if len(backends_test) < 2:
             pytest.skip("Veloxchem does not support f-functions. "
-                        "Not enough backends that support UHF available.")
+                        "Not enough backends available.")
         results = {}
         for b in backends_test:
             results[b] = adcc.ReferenceState(cached_backend_hf(b, system))
@@ -157,6 +159,14 @@ def compare_hf_properties(results, atol):
     for comb in itertools.combinations(results, r=2):
         refstate1 = results[comb[0]]
         refstate2 = results[comb[1]]
+
+        # assert same gauge origins
+        if len(set(comb) & set(backends_with_gauge_origin)) == 2:
+            gauge_origins = ["origin", "mass_center", "charge_center"]
+            for gauge_origin in gauge_origins:
+                assert_allclose(refstate1.gauge_origin_to_xyz(gauge_origin),
+                                refstate2.gauge_origin_to_xyz(gauge_origin),
+                                atol=1e-5)
 
         assert_allclose(refstate1.nuclear_total_charge,
                         refstate2.nuclear_total_charge, atol=atol)
@@ -197,7 +207,47 @@ def compare_adc_results(adc_results, atol):
                             "in block {}".format(block)
                 )
 
+        def fix_signs(actual, desired, atol):
+            fixed_signs = (
+                np.sign(actual * (np.absolute(actual) > atol))
+                * np.sign(desired * (np.absolute(desired) > atol))
+            )
+            for i in range(len(fixed_signs)):
+                if 1 in fixed_signs[i]:
+                    subs = 1
+                elif -1 in fixed_signs[i]:
+                    subs = -1
+                else:
+                    subs = np.nan
+                # zero components are given the same sign as the others
+                # if they are all zero, the sign is nan
+                fixed_signs[i][fixed_signs[i] == 0] = subs
+                assert (
+                    np.all(fixed_signs[i] == 1)
+                    or np.all(fixed_signs[i] == -1)
+                    or np.all(np.isnan(fixed_signs[i]))
+                )
+            return fixed_signs
+
+        def assert_allclose_signs(actual, desired):
+            shape = actual.shape[1:]
+            axis = tuple(range(1, len(shape) + 1))
+            # the nan entries should not be compared
+            idx_a = np.where(np.all(np.isnan(actual), axis=axis))
+            actual_mod = actual.copy()
+            for i in idx_a:
+                actual_mod[i] = desired[i]
+            idx_d = np.where(np.all(np.isnan(desired), axis=axis))
+            desired_mod = desired.copy()
+            for i in idx_d:
+                desired_mod[i] = actual[i]
+            np.testing.assert_allclose(actual_mod, desired_mod)
+
+        fixed_signs = None
         # test properties
+        # the signs of the transition moments can differ between different ADC
+        # calculations (due to the eigenvectors), but this should be uniform for
+        # all properties
         if "electric_dipole" in state1.operators.available and \
                 "electric_dipole" in state2.operators.available:
             assert_allclose(state1.oscillator_strength,
@@ -205,15 +255,87 @@ def compare_adc_results(adc_results, atol):
             assert_allclose(state1.state_dipole_moment,
                             state2.state_dipole_moment, atol=atol)
 
-        if "nabla" in state1.operators.available and \
-                "nabla" in state2.operators.available:
+            for i in range(len(state1.transition_dipole_moment)):
+                assert_allclose_signfix(
+                    state1.transition_dipole_moment[i],
+                    state2.transition_dipole_moment[i],
+                    atol=atol)
+            fixed_signs_new = fix_signs(
+                state1.transition_dipole_moment,
+                state2.transition_dipole_moment,
+                atol=atol
+            )
+            if fixed_signs is None:
+                fixed_signs = fixed_signs_new
+            else:
+                assert_allclose_signs(fixed_signs_new, fixed_signs)
+
+        if "electric_dipole_velocity" in state1.operators.available and \
+                "electric_dipole_velocity" in state2.operators.available:
             assert_allclose(state1.oscillator_strength_velocity,
                             state2.oscillator_strength_velocity, atol=atol)
+            for i in range(len(state1.transition_dipole_moment_velocity)):
+                assert_allclose_signfix(
+                    state1.transition_dipole_moment_velocity[i],
+                    state2.transition_dipole_moment_velocity[i],
+                    atol=atol)
+            fixed_signs_new = fix_signs(
+                state1.transition_dipole_moment_velocity,
+                state2.transition_dipole_moment_velocity,
+                atol=atol
+            )
+            if fixed_signs is None:
+                fixed_signs = fixed_signs_new
+            else:
+                assert_allclose_signs(fixed_signs_new, fixed_signs)
 
+        if "magnetic_dipole" in state1.operators.available and \
+                "magnetic_dipole" in state2.operators.available:
+            for i in range(len(state1.transition_magnetic_dipole_moment("origin"))):
+                assert_allclose_signfix(
+                    state1.transition_magnetic_dipole_moment("origin")[i],
+                    state2.transition_magnetic_dipole_moment("origin")[i],
+                    atol=atol)
+            fixed_signs_new = fix_signs(
+                state1.transition_magnetic_dipole_moment("origin"),
+                state2.transition_magnetic_dipole_moment("origin"),
+                atol=atol
+            )
+            if fixed_signs is None:
+                fixed_signs = fixed_signs_new
+            else:
+                assert_allclose_signs(fixed_signs_new, fixed_signs)
+
+        # Only in two backends the gauge origin selection is implemented.
+        if len(set(comb) & set(backends_with_gauge_origin)) == 2:
+            gauge_origins = ["origin", "mass_center", "charge_center"]
+        else:
+            gauge_origins = ["origin"]
         has_rotatory1 = all(op in state1.operators.available
-                            for op in ["magnetic_dipole", "nabla"])
+                            for op
+                            in ["magnetic_dipole", "electric_dipole_velocity"])
         has_rotatory2 = all(op in state2.operators.available
-                            for op in ["magnetic_dipole", "nabla"])
+                            for op
+                            in ["magnetic_dipole", "electric_dipole_velocity"])
         if has_rotatory1 and has_rotatory2:
             assert_allclose(state1.rotatory_strength,
-                            state2.rotatory_strength, atol=atol)
+                            state2.rotatory_strength,
+                            atol=atol)
+
+        has_rotatory_len1 = all(op in state1.operators.available
+                                for op
+                                in ["electric_dipole", "magnetic_dipole"])
+        has_rotatory_len2 = all(op in state2.operators.available
+                                for op
+                                in ["electric_dipole", "magnetic_dipole"])
+        if has_rotatory_len1 and has_rotatory_len2:
+            for gauge_origin in gauge_origins:
+                # reduce the tolerance criteria for mass_center as there are diff.
+                # isotropic mass values implemented in veloxchem and pyscf.
+                if gauge_origin == "mass_center":
+                    atol_tdm_mag = 2e-4
+                else:
+                    atol_tdm_mag = atol
+                assert_allclose(state1.rotatory_strength_length(gauge_origin),
+                                state2.rotatory_strength_length(gauge_origin),
+                                atol=atol_tdm_mag)

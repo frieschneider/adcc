@@ -54,7 +54,7 @@ class TestIsrMatrix:
         if operator_kind == "electric":  # example of a symmetric operator
             dips = state.reference_state.operators.electric_dipole
         elif operator_kind == "magnetic":  # example of an asymmetric operator
-            dips = state.reference_state.operators.magnetic_dipole('origin')
+            dips = state.reference_state.operators.magnetic_dipole("origin")
         else:
             raise NotImplementedError(f"Unexptected operator kind {operator_kind}")
 
@@ -83,7 +83,7 @@ class TestIsrMatrix:
                     s2s_tdm_ref = state2state.transition_dipole_moment[j]
                 else:
                     s2s_tdm_ref = \
-                        state2state.transition_magnetic_dipole_moment('origin')[j]
+                        state2state.transition_magnetic_dipole_moment("origin")[j]
                 np.testing.assert_allclose(s2s_tdm, s2s_tdm_ref, atol=1e-12)
 
 

@@ -50,12 +50,15 @@ class TestExcitedStates:
                     ref = getattr(state, key)[i]
                     res = getattr(exci, key)
                 except NotImplementedError:
-                    # nabla, etc. not implemented in dict backend
                     continue
                 except TypeError:
-                    # gauge origin dependent properties are callables
-                    ref = getattr(state, key)()[i]
-                    res = getattr(exci, key)()
+                    try:
+                        ref = getattr(state, key)("origin")[i]
+                        res = getattr(exci, key)("origin")
+                    except NotImplementedError:
+                        # electric dipole velocity integrals are not implemented in
+                        # the reference backend
+                        continue
                 if isinstance(ref, OneParticleOperator):
                     assert ref.blocks == res.blocks
                     for b in ref.blocks:
@@ -102,7 +105,7 @@ class TestExcitedStates:
                             state_corrected2.excitation_energy[i])
         state_corrected2.describe()
 
-    def test_dataframe_export(self):
+    def test_dataframe_export(self, gauge_origin="origin"):
         state = testdata_cache.adcc_states(
             system="h2o_sto3g", method="adc2", kind="singlet", case="gen"
         )
@@ -113,10 +116,26 @@ class TestExcitedStates:
         assert len(df.columns)
         for key in df.columns:
             if hasattr(state, key):
-                assert_allclose(df[key], getattr(state, key))
+                try:
+                    assert_allclose(df[key], getattr(state, key))
+                except TypeError:
+                    assert_allclose(df[key], getattr(state, key)(gauge_origin))
             elif hasattr(state, key[:-2]):
                 newkey = key[:-2]
                 i = components.index(key[-1])
-                assert_allclose(df[key], getattr(state, newkey)[:, i])
+                try:
+                    assert_allclose(df[key], getattr(state, newkey)[:, i])
+                except TypeError:
+                    assert_allclose(df[key],
+                                    getattr(state, newkey)(gauge_origin)[:, i])
+            elif hasattr(state, key[:-3]):
+                newkey = key[:-3]
+                i = components.index(key[-1])
+                j = components.index(key[-2])
+                try:
+                    assert_allclose(df[key], getattr(state, newkey)[:, i, j])
+                except TypeError:
+                    assert_allclose(df[key],
+                                    getattr(state, newkey)(gauge_origin)[:, i, j])
             else:
                 raise KeyError(f"Key {key} not found in ExcitedStates object.")
