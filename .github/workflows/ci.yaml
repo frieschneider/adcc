@@ -4,7 +4,7 @@ on:
     branches: [master]
   pull_request:
   schedule:
-    - cron:  '0 4 * * 6'  # Run every Sunday
+    - cron:  '0 4 * * 6'  # Run every Saturday
 
 jobs:
   #
@@ -17,9 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {version: '3.11', os: ubuntu-latest, documentation: True}
+          - {version: '3.13', os: ubuntu-latest, documentation: True}
           - {version: '3.9', os: ubuntu-latest, documentation: False}
-          - {version: '3.11', os: macos-latest, documentation: False}
+          - {version: '3.13', os: macos-latest, documentation: False}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,13 +75,12 @@ jobs:
         if: matrix.documentation
       - name: Build documentation
         run: |
-          cd docs && doxygen && cd ..
-          sphinx-build -M html docs build/sphinx
+          ./setup.py build_docs
         if: matrix.documentation
       - name: Upload documentation artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/sphinx/html
+          path: build/docs/html
         if: matrix.documentation
       #
       - name: Upload coverage to codecov
@@ -92,7 +91,7 @@ jobs:
           pip install codecov
           codecov -X gcov
           lcov --keep-going --directory . --capture --output-file coverage.info
-          lcov --ignore-errors unused --remove coverage.info '/opt/*' '/Applications/*' '/Library/*' '/usr/*' "${HOME}"'/.cache/*' "${HOME}"'/.local/*' "${PWD}"'/build/*' "${PWD}"'/libadcc/tests/*' --output-file coverage.info
+          lcov --ignore-errors unused --remove coverage.info '/opt/*' '/Applications/*' '/Library/*' '/usr/*' '/tmp/*' "${HOME}"'/.cache/*' "${HOME}"'/.local/*' "${PWD}"'/build/*' "${PWD}"'/libadcc/tests/*' --output-file coverage.info
           lcov --list coverage.info
           codecov -X gcov -f coverage.info
         env:
@@ -138,8 +137,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {version: '3.11', os: ubuntu-latest, documentation: False}
-          - {version: '3.11', os: macos-latest, documentation: False}
+          - {version: '3.13', os: ubuntu-latest, documentation: False}
+          - {version: '3.13', os: macos-latest, documentation: False}
     defaults:
       run:
         shell: bash -l {0}
@@ -159,10 +158,6 @@ jobs:
           miniforge-version: latest
           python-version: ${{ matrix.version }}
           auto-activate-base: false
-      # - name: Dump siteconfig with coverage flags for C++
-      #   run: |
-      #     mkdir $HOME/.adcc/
-      #     echo 'coverage = True' > $HOME/.adcc/siteconfig.py
       - name: Install Psi4 from c-f
         run: |
           mamba install psi4 pyddx -c conda-forge -c conda-forge/label/libint_dev
@@ -211,7 +206,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
       - name: Install dependencies
         run: |
           pip install flake8
