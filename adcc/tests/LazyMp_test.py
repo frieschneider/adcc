@@ -26,6 +26,7 @@ from pytest import approx
 
 from adcc import block as b
 from adcc import LazyMp
+from adcc import OperatorSymmetry
 
 from .testdata_cache import testdata_cache
 from . import testcases
@@ -166,7 +167,7 @@ class TestLazyMp:
         )
         mp2diff = instances.get(system, case).mp2_diffdm
 
-        assert mp2diff.is_symmetric
+        assert mp2diff.symmetry is OperatorSymmetry.HERMITIAN
         blocks = ["o1o1", "o1v1", "v1v1"]
         if "cvs" in case:
             blocks.extend(["o2o1", "o2o2", "o2v1"])

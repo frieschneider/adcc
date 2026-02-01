@@ -2,7 +2,7 @@
 ## vi: tabstop=4 shiftwidth=4 softtabstop=4 expandtab
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2019 by the adcc authors
+## Copyright (C) 2026 by the adcc authors
 ##
 ## This file is part of adcc.
 ##
@@ -20,17 +20,17 @@
 ## along with adcc. If not, see <http://www.gnu.org/licenses/>.
 ##
 ## ---------------------------------------------------------------------
+from .NParticleDensity import NParticleDensity
+from .NParticleOperator import OperatorSymmetry
 import libadcc
-
-from .NParticleOperator import NParticleOperator, OperatorSymmetry
 from .functions import einsum
 from .MoSpaces import split_spaces
 
 
-class OneParticleOperator(NParticleOperator):
+class OneParticleDensity(NParticleDensity):
     def __init__(self, spaces, symmetry=OperatorSymmetry.HERMITIAN):
         """
-        Construct an OneParticleOperator object. All blocks are initialised
+        Construct an OneParticleDensity object. All blocks are initialised
         as zero blocks.
 
         Parameters
@@ -44,9 +44,9 @@ class OneParticleOperator(NParticleOperator):
 
     def _construct_empty(self):
         """
-        Create an empty instance of an OneParticleOperator
+        Create an empty instance of an OneParticleDensity
         """
-        return OneParticleOperator(
+        return OneParticleDensity(
             self.mospaces,
             symmetry=self.symmetry,
         )
@@ -60,26 +60,20 @@ class OneParticleOperator(NParticleOperator):
             for sp in self.orbital_subspaces:
                 coeff_map[sp + "_a"] = refstate.orbital_coefficients_alpha(sp + "b")
                 coeff_map[sp + "_b"] = refstate.orbital_coefficients_beta(sp + "b")
-            ovlp = refstate.operators.overlap_ao
         else:
             raise TypeError("refstate needs to be an libadcc.ReferenceState.")
 
         dm_bb_a = 0
         dm_bb_b = 0
-
         for block in self.blocks_nonzero:
-            # only canonical blocks
             s1, s2 = split_spaces(block)
-            # (anti-)hermitian operators: scale off-diagonal block of operator
-            # by 2 because only one of the blocks is actually present
-            pref = self.canonical_factors[block]
-
-            dm_bb_a += pref * einsum("lm,im,ij,jv,vs->ls",
-                                     ovlp, coeff_map[f"{s1}_a"],
-                                     self.block(block), coeff_map[f"{s2}_a"], ovlp)
-            dm_bb_b += pref * einsum("lm,im,ij,jv,vs->ls",
-                                     ovlp, coeff_map[f"{s1}_b"],
-                                     self.block(block), coeff_map[f"{s2}_b"], ovlp)
+            # (anti-)hermitian operators: scale matrix element by 2
+            # because only one of the blocks is actually present
+            factor = self.canonical_factors[block]
+            dm_bb_a += factor * einsum("ip,ij,jq->pq", coeff_map[f"{s1}_a"],
+                                       self.block(block), coeff_map[f"{s2}_a"])
+            dm_bb_b += factor * einsum("ip,ij,jq->pq", coeff_map[f"{s1}_b"],
+                                       self.block(block), coeff_map[f"{s2}_b"])
         if self.symmetry == OperatorSymmetry.HERMITIAN:
             dm_bb_a = dm_bb_a.symmetrise()
             dm_bb_b = dm_bb_b.symmetrise()

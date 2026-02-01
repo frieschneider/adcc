@@ -27,6 +27,7 @@ from .AdcMethod import AdcMethod
 from .adc_pp import bmatrix as ppbmatrix
 from .AmplitudeVector import AmplitudeVector
 from .LazyMp import LazyMp
+from .NParticleOperator import OperatorSymmetry
 from .OneParticleOperator import OneParticleOperator
 from .timings import Timer, timed_member_call
 
@@ -129,19 +130,18 @@ class IsrMatrix(AdcMatrixlike):
 
     def rmatvec(self, v):
         # Hermitian operators
-        if all(op.is_symmetric for op in self.operator):
+        if all(op.symmetry is OperatorSymmetry.HERMITIAN for op in self.operator):
             return self.matvec(v)
-        else:
-            diffv = [op.ov + op.vo.transpose((1, 0)) for op in self.operator]
-            # anti-Hermitian operators
-            if all(dv.dot(dv) < 1e-12 for dv in diffv):
-                return [
-                    AmplitudeVector(ph=-1.0 * mv.ph, pphh=-1.0 * mv.pphh)
-                    for mv in self.matvec(v)
-                ]
+        # anti-Hermitian operators
+        elif all(op.symmetry is OperatorSymmetry.ANTIHERMITIAN
+                 for op in self.operator):
+            return [
+                AmplitudeVector(ph=-1.0 * mv.ph, pphh=-1.0 * mv.pphh)
+                for mv in self.matvec(v)
+            ]
             # operators without any symmetry
-            else:
-                return NotImplemented
+        else:
+            return NotImplemented
 
     def __matmul__(self, other):
         """

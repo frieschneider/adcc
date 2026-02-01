@@ -35,7 +35,7 @@ from pyscf.solvent import ddcosmo
 
 class PyScfOperatorIntegralProvider:
     available: tuple[str, ...] = (
-        "electric_dipole", "electric_dipole_velocity", "magnetic_dipole",
+        "overlap", "electric_dipole", "electric_dipole_velocity", "magnetic_dipole",
         "electric_quadrupole", "electric_quadrupole_traceless",
         "electric_quadrupole_velocity", "diamagnetic_magnetizability",
         "pe_induction_elec", "pcm_potential_elec"
@@ -44,6 +44,10 @@ class PyScfOperatorIntegralProvider:
     def __init__(self, scfres):
         self.scfres = scfres
         self.backend = "pyscf"
+
+    @property
+    def overlap(self) -> np.ndarray:
+        return self.scfres.mol.intor_symmetric('int1e_ovlp')
 
     @property
     def electric_dipole(self) -> tuple[np.ndarray, ...]:
@@ -187,7 +191,7 @@ class PyScfEriBuilder(EriBuilder):
 
     def compute_mo_eri(self, blocks, spins):
         coeffs = tuple(self.coefficients[blocks[i] + spins[i]] for i in range(4))
-        # TODO Pyscf usse HDF5 internal to do the AO2MO here we read it all
+        # TODO Pyscf uses HDF5 internal to do the AO2MO here we read it all
         #      into memory. This wastes memory and could be avoided if temporary
         #      files were used instead. These could be deleted on the call
         #      to `flush_cache` automatically.
