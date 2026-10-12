@@ -204,13 +204,28 @@ def block_ph_ph_1(hf, mp, intermediates):
         + direct_sum("a-i->ia", hf.fvv.diagonal(), fCC.diagonal())  # order 0
         - einsum("IaIa->Ia", CvCv)  # order 1
     ))  # fmt: skip
+    has_u = hf.has_nonzero_uoo or hf.has_nonzero_uvv
+    if has_u:
+        if hf.has_core_occupied_space:
+            raise NotImplementedError("u_oo / u_vv terms not implemented for CVS.")
+        # additional ROHF-DODS terms (zero for canonical references)
+        diagonal.ph = diagonal.ph + (
+            direct_sum("a-i->ia", hf.uvv.diagonal(), hf.uoo.diagonal())  # order 1
+        )
 
     def apply(ampl):
-        return AmplitudeVector(ph=(                 # PT order
+        ph = (                                      # PT order
             + einsum("ib,ab->ia", ampl.ph, hf.fvv)  # 0
             - einsum("IJ,Ja->Ia", fCC, ampl.ph)     # 0
             - einsum("JaIb,Jb->Ia", CvCv, ampl.ph)  # 1
-        ))  # fmt: skip
+        )  # fmt: skip
+        if has_u:
+            # additional ROHF-DODS terms (zero for canonical references)
+            ph = ph + (
+                + einsum("ib,ab->ia", ampl.ph, hf.uvv)  # 1
+                - einsum("ij,ja->ia", hf.uoo, ampl.ph)  # 1
+            )  # fmt: skip
+        return AmplitudeVector(ph=ph)
 
     return AdcBlock(apply, diagonal)
 
@@ -379,6 +394,12 @@ def block_ph_ph_2(hf, mp, intermediates):
         - einsum("IaIa->Ia", hf.ovov)
         - einsum("ikac,ikac->ia", mp.t2oo, hf.oovv)
     ))  # fmt: skip
+    has_u = hf.has_nonzero_uoo or hf.has_nonzero_uvv
+    if has_u:
+        # additional ROHF-DODS terms (zero for canonical references)
+        diagonal.ph = diagonal.ph + (
+            direct_sum("a-i->ia", hf.uvv.diagonal(), hf.uoo.diagonal())  # 1
+        )
 
     # Not used anywhere else, so kept as an anonymous intermediate
     term_t2_eri = (
@@ -387,12 +408,61 @@ def block_ph_ph_2(hf, mp, intermediates):
     ).evaluate()  # fmt: skip
 
     def apply(ampl):
-        return AmplitudeVector(ph=(
+        ph = (
             + einsum("ib,ab->ia", ampl.ph, i1)
             - einsum("ij,ja->ia", i2, ampl.ph)
             - einsum("jaib,jb->ia", hf.ovov, ampl.ph)    # 1
             - 0.5 * einsum("ikac,kc->ia", term_t2_eri, ampl.ph)  # 2
-        ))  # fmt: skip
+        )  # fmt: skip
+        if has_u:
+            # additional ROHF-DODS terms (zero for canonical references)
+            ph = ph + (
+                + einsum("ib,ab->ia", ampl.ph, hf.uvv)  # 1
+                - einsum("ij,ja->ia", hf.uoo, ampl.ph)  # 1
+            )  # fmt: skip
+        if hf.has_nonzero_fov:
+            # additional ROHF-DODS terms (zero for canonical references)
+            t1_1 = mp.ts1(b.ov)
+            F_ov = hf.fov
+            ph = ph + (
+                # N^4: O^3V^1 / N^4: O^3V^1
+                + 1 * einsum("ik,ka->ia",
+                             einsum("jb,jkib->ik", ampl.ph, hf.ooov), t1_1)
+                # N^4: O^1V^3 / N^4: O^1V^3
+                + 1 * einsum("ac,ic->ia",
+                             einsum("jb,jabc->ac", ampl.ph, hf.ovvv), t1_1)
+                # N^4: O^3V^1 / N^4: O^3V^1
+                + 1 * einsum("jk,ijka->ia",
+                             einsum("kb,jb->jk", ampl.ph, t1_1), hf.ooov)
+                # N^4: O^1V^3 / N^4: O^1V^3
+                + 1 * einsum("bc,icab->ia",
+                             einsum("jc,jb->bc", ampl.ph, t1_1), hf.ovvv)
+                # N^4: O^3V^1 / N^4: O^3V^1
+                - 1 * einsum("ij,ja->ia",
+                             einsum("kb,jkib->ij", t1_1, hf.ooov), ampl.ph)
+                # N^4: O^3V^1 / N^4: O^3V^1
+                - 1 * einsum("ik,ka->ia",
+                             einsum("jb,ijkb->ik", t1_1, hf.ooov), ampl.ph)
+                # N^4: O^1V^3 / N^4: O^1V^3
+                - 1 * einsum("ab,ib->ia",
+                             einsum("jc,jabc->ab", t1_1, hf.ovvv), ampl.ph)
+                # N^4: O^1V^3 / N^4: O^1V^3
+                - 1 * einsum("ac,ic->ia",
+                             einsum("jb,jcab->ac", t1_1, hf.ovvv), ampl.ph)
+                # N^3: O^2V^1 / N^2: O^1V^1
+                - 0.5 * einsum("ij,ja->ia",
+                               einsum("ib,jb->ij", t1_1, F_ov), ampl.ph)
+                # N^3: O^2V^1 / N^2: O^1V^1
+                - 0.5 * einsum("ij,ja->ia",
+                               einsum("jb,ib->ij", t1_1, F_ov), ampl.ph)
+                # N^3: O^2V^1 / N^2: O^1V^1
+                - 0.5 * einsum("ij,ja->ia",
+                               einsum("ib,jb->ij", ampl.ph, F_ov), t1_1)
+                # N^3: O^2V^1 / N^2: O^1V^1
+                - 0.5 * einsum("ij,ja->ia",
+                               einsum("ib,jb->ij", ampl.ph, t1_1), F_ov)
+            )  # fmt: skip
+        return AmplitudeVector(ph=ph)
 
     return AdcBlock(apply, diagonal)
 
@@ -812,136 +882,136 @@ def block_pphh_ph_3(hf, mp, intermediates):
     t2eri_7 = mp.t2eri(b.ovvv, b.ov).evaluate()
 
     def apply(ampl):
-        ur1 = ampl.ph
+        ampl.ph = ampl.ph
         return AmplitudeVector(pphh=(
             (
-                + einsum("ic,jcab->ijab", ur1, pib_ovvv)
-                + einsum("lkic,kc,jlab->ijab", hf.ooov, ur1, t2_1)  # 2st
+                + einsum("ic,jcab->ijab", ampl.ph, pib_ovvv)
+                + einsum("lkic,kc,jlab->ijab", hf.ooov, ampl.ph, t2_1)  # 2st
             ).antisymmetrise(0, 1)
             + (
-                - einsum("ijka,kb->ijab", pia_ooov, ur1)
-                - einsum("ijac,kbcd,kd->ijab", t2_1, hf.ovvv, ur1)  # 2st
+                - einsum("ijka,kb->ijab", pia_ooov, ampl.ph)
+                - einsum("ijac,kbcd,kd->ijab", t2_1, hf.ovvv, ampl.ph)  # 2st
             ).antisymmetrise(2, 3)
             # 3rd order
             + 2 * (
                 # N^5: O^3V^2 / N^4: O^2V^2
                 + 0.5 * einsum("ik,jkab->ijab",
-                               einsum("lc,klic->ik", ur1, hf.ooov), t2_2)
+                               einsum("lc,klic->ik", ampl.ph, hf.ooov), t2_2)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 0.25 * einsum("il,jlab->ijab",
-                                einsum("kc,lkic->il", ur1, t2eri_2), t2_1)
+                                einsum("kc,lkic->il", ampl.ph, t2eri_2), t2_1)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 0.25 * einsum("id,jdab->ijab",
-                                einsum("kc,idkc->id", ur1, t2sq), hf.ovvv)
+                                einsum("kc,idkc->id", ampl.ph, t2sq), hf.ovvv)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 1 / 8 * einsum("jl,ilab->ijab",
-                                 einsum("kc,kljc->jl", ur1, t2eri_1), t2_1)
+                                 einsum("kc,kljc->jl", ampl.ph, t2eri_1), t2_1)
                 # N^5: O^1V^4 / N^4: V^4
                 + 0.5 * einsum("iabc,jc->ijab",
-                               einsum("id,abcd->iabc", ur1, hf.vvvv), t1_2)
+                               einsum("id,abcd->iabc", ampl.ph, hf.vvvv), t1_2)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 - 0.25 * einsum("ijkl,klab->ijab",
-                                einsum("ic,kljc->ijkl", ur1, hf.ooov), t2_2)
+                                einsum("ic,kljc->ijkl", ampl.ph, hf.ooov), t2_2)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 0.25 * einsum("jd,idab->ijab",
-                                einsum("jc,cd->jd", ur1, p0_2_vv), hf.ovvv)
+                                einsum("jc,cd->jd", ampl.ph, p0_2_vv), hf.ovvv)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 0.25 * einsum("jkab,ik->ijab",
-                                einsum("jc,kcab->jkab", ur1, hf.ovvv), p0_2_oo)
+                                einsum("jc,kcab->jkab", ampl.ph, hf.ovvv), p0_2_oo)
                 # N^7: O^4V^3 / N^6: O^3V^3
                 - 0.25 * einsum("jklc,iklabc->ijab",
-                                einsum("jd,klcd->jklc", ur1, hf.oovv), t3_2)
+                                einsum("jd,klcd->jklc", ampl.ph, hf.oovv), t3_2)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 - 1 / 16 * einsum("ijkl,klab->ijab",
-                                  einsum("jc,klic->ijkl", ur1, t2eri_1), t2_1)
+                                  einsum("jc,klic->ijkl", ampl.ph, t2eri_1), t2_1)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 1 / 8 * einsum("jk,ikab->ijab",
                                  einsum("kc,jc->jk",
                                         einsum("klde,lcde->kc", t2_1, hf.ovvv),
-                                        ur1), t2_1)
+                                        ampl.ph), t2_1)
             ).antisymmetrise(0, 1)
             + 2 * (
                 # N^5: O^2V^3 / N^4: O^1V^3
                 + 0.5 * einsum("ac,ijbc->ijab",
-                               einsum("kd,kacd->ac", ur1, hf.ovvv), t2_2)
+                               einsum("kd,kacd->ac", ampl.ph, hf.ovvv), t2_2)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 0.25 * einsum("bd,ijad->ijab",
-                                einsum("kc,kbdc->bd", ur1, t2eri_7), t2_1)
+                                einsum("kc,kbdc->bd", ampl.ph, t2eri_7), t2_1)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 0.25 * einsum("la,ijlb->ijab",
-                                einsum("kc,kcla->la", ur1, t2sq), hf.ooov)
+                                einsum("kc,kcla->la", ampl.ph, t2sq), hf.ooov)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 1 / 8 * einsum("bd,ijad->ijab",
-                                 einsum("kc,kbcd->bd", ur1, t2eri_6), t2_1)
+                                 einsum("kc,kbcd->bd", ampl.ph, t2eri_6), t2_1)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 + 0.5 * einsum("ijka,kb->ijab",
-                               einsum("la,ijkl->ijka", ur1, hf.oooo), t1_2)
+                               einsum("la,ijkl->ijka", ampl.ph, hf.oooo), t1_2)
                 # N^6: O^3V^3 / N^4: O^1V^3
                 - 0.25 * einsum("ijkb,ka->ijab",
-                                einsum("ijcd,kbcd->ijkb", t2_2, hf.ovvv), ur1)
+                                einsum("ijcd,kbcd->ijkb", t2_2, hf.ovvv), ampl.ph)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 0.25 * einsum("ijkb,ka->ijab",
-                                einsum("ijkc,bc->ijkb", hf.ooov, p0_2_vv), ur1)
+                                einsum("ijkc,bc->ijkb", hf.ooov, p0_2_vv), ampl.ph)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 0.25 * einsum("la,ijlb->ijab",
-                                einsum("ka,kl->la", ur1, p0_2_oo), hf.ooov)
+                                einsum("ka,kl->la", ampl.ph, p0_2_oo), hf.ooov)
                 # N^7: O^4V^3 / N^6: O^3V^3
                 - 0.25 * einsum("ijla,lb->ijab",
-                                einsum("ijkacd,klcd->ijla", t3_2, hf.oovv), ur1)
+                                einsum("ijkacd,klcd->ijla", t3_2, hf.oovv), ampl.ph)
                 # N^6: O^3V^3 / N^4: O^1V^3
                 - 1 / 16 * einsum("ijka,kb->ijab",
-                                  einsum("ijcd,kacd->ijka", t2_1, t2eri_6), ur1)
+                                  einsum("ijcd,kacd->ijka", t2_1, t2eri_6), ampl.ph)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 1 / 8 * einsum("ijka,kb->ijab",
                                  einsum("kc,ijac->ijka",
                                         einsum("lmcd,lmkd->kc", t2_1, hf.ooov),
-                                        t2_1), ur1)
+                                        t2_1), ampl.ph)
             ).antisymmetrise(2, 3)
             + (
                 # N^6: O^3V^3 / N^6: O^3V^3
                 - 0.5 * einsum("kc,ijkabc->ijab",
-                               einsum("ld,klcd->kc", ur1, hf.oovv), t3_2)
+                               einsum("ld,klcd->kc", ampl.ph, hf.oovv), t3_2)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 + 1 / 8 * einsum("ijlm,lmab->ijab",
                                  einsum("klmd,ijkd->ijlm",
-                                        einsum("kc,lmcd->klmd", ur1, t2_1),
+                                        einsum("kc,lmcd->klmd", ampl.ph, t2_1),
                                         hf.ooov), t2_1)
                 # N^6: O^4V^2 / N^4: O^1V^3
                 + 1 / 8 * einsum("ijkl,klab->ijab",
                                  einsum("ijde,klde->ijkl", t2_1, t2_1),
-                                 einsum("kc,lcab->klab", ur1, hf.ovvv))
+                                 einsum("kc,lcab->klab", ampl.ph, hf.ovvv))
             )
             + 4 * (
                 # N^6: O^3V^3 / N^4: O^1V^3
                 - 0.25 * einsum("ikad,jbkd->ijab",
-                                einsum("kc,icad->ikad", ur1, hf.ovvv), t2sq)
+                                einsum("kc,icad->ikad", ampl.ph, hf.ovvv), t2sq)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 - 0.25 * einsum("jklb,ilka->ijab",
-                                einsum("kc,jblc->jklb", ur1, t2sq), hf.ooov)
+                                einsum("kc,jblc->jklb", ampl.ph, t2sq), hf.ooov)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 + 0.5 * einsum("ijka,kb->ijab",
-                               einsum("ic,jcka->ijka", ur1, hf.ovov), t1_2)
+                               einsum("ic,jcka->ijka", ampl.ph, hf.ovov), t1_2)
                 # N^6: O^3V^3 / N^4: O^1V^3
                 + 0.5 * einsum("ikac,jkbc->ijab",
-                               einsum("id,kacd->ikac", ur1, hf.ovvv), t2_2)
+                               einsum("id,kacd->ikac", ampl.ph, hf.ovvv), t2_2)
                 # N^6: O^3V^3 / N^4: O^1V^3
                 - 0.25 * einsum("ikbd,jkad->ijab",
-                                einsum("ic,kbdc->ikbd", ur1, t2eri_7), t2_1)
+                                einsum("ic,kbdc->ikbd", ampl.ph, t2eri_7), t2_1)
                 # N^5: O^2V^3 / N^4: O^1V^3
                 - 0.25 * einsum("ijad,bd->ijab",
-                                einsum("ic,jcad->ijad", ur1, hf.ovvv), p0_2_vv)
+                                einsum("ic,jcad->ijad", ampl.ph, hf.ovvv), p0_2_vv)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 + 0.5 * einsum("ijkb,ka->ijab",
-                               einsum("jc,ickb->ijkb", t1_2, hf.ovov), ur1)
+                               einsum("jc,ickb->ijkb", t1_2, hf.ovov), ampl.ph)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 + 0.5 * einsum("ijlb,la->ijab",
-                               einsum("jkbc,klic->ijlb", t2_2, hf.ooov), ur1)
+                               einsum("jkbc,klic->ijlb", t2_2, hf.ooov), ampl.ph)
                 # N^6: O^4V^2 / N^4: O^2V^2
                 - 0.25 * einsum("ijkb,ka->ijab",
-                                einsum("jlbc,lkic->ijkb", t2_1, t2eri_2), ur1)
+                                einsum("jlbc,lkic->ijkb", t2_1, t2eri_2), ampl.ph)
                 # N^5: O^3V^2 / N^4: O^2V^2
                 - 0.25 * einsum("ijkb,ka->ijab",
-                                einsum("jlkb,il->ijkb", hf.ooov, p0_2_oo), ur1)
+                                einsum("jlkb,il->ijkb", hf.ooov, p0_2_oo), ampl.ph)
             ).antisymmetrise(0, 1).antisymmetrise(2, 3)
         ))  # fmt: skip
 

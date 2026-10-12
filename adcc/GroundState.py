@@ -73,6 +73,13 @@ class GroundState:
     def t2cc(self) -> libadcc.Tensor:
         return self.td1(b.ccvv)
 
+    def ts1(self, space: str) -> libadcc.Tensor:
+        """First-order ground state singles amplitudes"""
+        raise NotImplementedError(
+            "First-order ground state singles amplitudes not implemented on "
+            f"{self.__class__.__name__} class."
+        )
+
     def ts2(self, space: str, apply_cvs: bool = False) -> libadcc.Tensor:
         """Second-order ground state singles amplitudes"""
         # NOTE: In contrast to the other amplitudes, ts2 has the additional

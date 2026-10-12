@@ -168,6 +168,9 @@ class ReferenceState(libadcc.ReferenceState):
             self.conv_tol,
         )
 
+        # AO Fock matrices (alpha, beta), only provided by some backends
+        self._fock_ao = getattr(hfdata, "fock_ao", None)
+
         self.environment = None  # no environment attached by default
         for name in ["excitation_energy_corrections", "environment"]:
             if hasattr(hfdata, name):
@@ -262,6 +265,63 @@ class ReferenceState(libadcc.ReferenceState):
                 density[block].set_mask("iijj", 0)
         density.reference_state = self
         return density
+
+    @cached_property
+    def has_nonzero_fov(self) -> bool:
+        """
+        Whether the occupied-virtual Fock block is non-zero (e.g. ROHF-DODS).
+        Elements below sqrt(conv_tol) are treated as SCF convergence noise.
+        """
+        return self._is_nonzero(self.fov)
+
+    def _fock_minus_diagonal(self, space: str) -> Tensor:
+        """
+        Block of the Fock matrix (from the AO Fock matrices of the backend)
+        minus the Fock matrix used by adcc (orbital energies on the diagonal),
+        i.e., V1 = F - R if H0 = R (e.g. ROHF-DODS).
+        """
+        fock_a, fock_b = self._fock_ao
+        zero = np.zeros_like(fock_a)
+        sym = libadcc.make_symmetry_operator_basis(
+            self.mospaces, fock_a.shape[0], OperatorSymmetry.HERMITIAN.to_str(), 1, "ab"
+        )
+        fock_bb = Tensor(sym)
+        fock_bb.set_from_ndarray(np.block([[fock_a, zero], [zero, fock_b]]), 1e-14)
+        s1, s2 = split_spaces(space)
+        fock_mo = (
+            self.orbital_coefficients(s1 + "b")
+            @ fock_bb
+            @ self.orbital_coefficients(s2 + "b").transpose()
+        )
+        ret = self.fock(space).zeros_like()
+        ret.set_from_ndarray(
+            fock_mo.to_ndarray() - self.fock(space).to_ndarray(), self.conv_tol
+        )
+        return ret
+
+    @cached_property
+    def uoo(self) -> Tensor:
+        """Occupied-occupied block of V1 = F - R (non-zero e.g. for ROHF-DODS)."""
+        return self._fock_minus_diagonal("o1o1")
+
+    @cached_property
+    def uvv(self) -> Tensor:
+        """Virtual-virtual block of V1 = F - R (non-zero e.g. for ROHF-DODS)."""
+        return self._fock_minus_diagonal("v1v1")
+
+    def _is_nonzero(self, tensor: Tensor) -> bool:
+        # elements below sqrt(conv_tol) are treated as SCF convergence noise
+        return bool(np.max(np.abs(tensor.to_ndarray()), initial=0) > np.sqrt(self.conv_tol))
+
+    @cached_property
+    def has_nonzero_uoo(self) -> bool:
+        """Whether the occupied-occupied block of V1 = F - R is non-zero."""
+        return self._fock_ao is not None and self._is_nonzero(self.uoo)
+
+    @cached_property
+    def has_nonzero_uvv(self) -> bool:
+        """Whether the virtual-virtual block of V1 = F - R is non-zero."""
+        return self._fock_ao is not None and self._is_nonzero(self.uvv)
 
     @cached_property
     def dipole_moment(self):

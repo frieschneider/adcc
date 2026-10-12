@@ -51,6 +51,16 @@ class LazyMp(GroundState):
         # occupied and virtual indices both have to be symmetrized!
         return hf.eri(space) / direct_sum("ia+jb->ijab", eia, ejb).symmetrise((2, 3))
 
+    @cached_member_function()
+    def ts1(self, space: str) -> libadcc.Tensor:
+        """First-order singles amplitudes (usually zero)"""
+        hf = self.reference_state
+        sp = split_spaces(space)
+        assert all(s == b.v for s in sp[1:])
+        eia = self.df(sp[0] + b.v)
+        # f_ia / (e_i - e_a)
+        return -hf.fov / eia
+
     def ts2(self, space: str, apply_cvs: bool = False) -> libadcc.Tensor:
         """
         Computes the second-order MP singles amplitudes.

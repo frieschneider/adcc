@@ -20,6 +20,7 @@
 ##
 ## ---------------------------------------------------------------------
 from collections.abc import Callable
+from functools import cached_property
 from typing import Literal, get_args
 
 import numpy as np
@@ -378,10 +379,51 @@ class PyScfHFProvider(libadcc.HartreeFockProvider):
         else:
             out[:] = np.hstack((self.scfres.mo_energy[0], self.scfres.mo_energy[1]))
 
-    def fill_fock_ff(self, slices: Slices2D, out: Array2D) -> None:
+    @cached_property
+    def fock_ao(self) -> tuple[Array2D, Array2D] | None:
+        """
+        The (alpha, beta) Fock matrices in the AO basis. None if an environment
+        is attached: get_fock() would rebuild the solvent contribution with the
+        current (e.g. optical) settings, not the ones of the SCF.
+        """
+        if self.environment is not None:
+            return None
+        fock_ao = self.scfres.get_fock()
+        if self.restricted:
+            return fock_ao, fock_ao
+        return fock_ao[0], fock_ao[1]
+
+    @cached_property
+    def _fock_ff(self) -> Array2D:
+        # Diagonal: orbital energies. Occupied-virtual blocks: MO transformed
+        # AO Fock matrix, only kept if non-zero beyond SCF convergence noise
+        # (e.g. ROHF-DODS). All other elements are zero.
         diagonal = np.empty(self.n_orbs)
         self.fill_orben_f(diagonal)
-        out[:] = np.diag(diagonal)[slices]
+        fock = np.diag(diagonal)
+        fock_ao = self.fock_ao
+        if fock_ao is None:
+            return fock
+        if self.restricted:
+            mo_coeff = (self.scfres.mo_coeff, self.scfres.mo_coeff)
+            mo_occ = (self.scfres.mo_occ, self.scfres.mo_occ)
+        else:
+            mo_coeff = self.scfres.mo_coeff
+            mo_occ = self.scfres.mo_occ
+        fock_ov = fock.copy()
+        for spin, offset in enumerate((0, self.n_orbs_alpha)):
+            occ = np.flatnonzero(mo_occ[spin] > 0)
+            virt = np.flatnonzero(mo_occ[spin] == 0)
+            coeff = mo_coeff[spin]
+            fov = coeff[:, occ].T @ fock_ao[spin] @ coeff[:, virt]
+            fock_ov[np.ix_(offset + occ, offset + virt)] = fov
+            fock_ov[np.ix_(offset + virt, offset + occ)] = fov.T
+        if np.max(np.abs(fock_ov - fock)) > np.sqrt(self.get_conv_tol()):
+            return fock_ov
+        return fock
+
+    def fill_fock_ff(self, slices: Slices2D, out: Array2D) -> None:
+        out[:] = self._fock_ff[slices]
 
     def fill_eri_ffff(self, slices: Slices4D, out: Array4D) -> None:
         self.eri_builder.fill_slice_symm(slices, out)
